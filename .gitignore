@@ -1,0 +1,73 @@
+# Dependencies
+node_modules/
+package-lock.json
+config/local.json
+local.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build
+dist/
+build/
+out/
+
+#Husky
+.husky/
+
+# Tests
+coverage/
+.vitest/
+
+# TypeScript
+*.tsbuildinfo
+
+# Editor directories and files
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+logsmultichain.txt
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Debug
+.pnpm-debug.log*
+
+# Cache
+.cache/
+.npm/
+.eslintcache
+.stylelintcache
+.prettiercache
+
+# Misc
+temp/
+tmp/
+
+# Test files
+test_reader.ts
