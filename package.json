@@ -1,16 +1,18 @@
 {
-  "name": "shared",
+  "name": "crudapibuilder",
   "version": "1.0.0",
   "private": true,
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "type": "module",
   "scripts": {
     "build": "tsc",
     "lint": "eslint ./src --fix",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\""
   },
+  "author": "Jesús Torres <jesust07@gmail.com>",
+  "license": "MIT",
   "imports": {
-    "#eslint/*": "./src/eslint/*"
+    "#eslint/*": "./src/eslint/*",
+    "#root/*": "./dist/*"
   },
   "exports": {
     ".": "./dist/index.js",
@@ -27,15 +29,12 @@
     "argon2": "^0.43.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
-    "convict": "^6.2.4",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "cross-env": "^7.0.3",
     "express": "^5.1.0",
     "mongodb": "^6.18.0",
     "openapi-types": "^12.1.3",
-    "qrcode": "^1.5.4",
-    "qrcode-terminal": "^0.12.0",
     "redis": "^5.8.2",
     "reflect-metadata": "^0.2.2",
     "speakeasy": "^2.0.0",
@@ -45,10 +44,13 @@
     "yamljs": "^0.3.0"
   },
   "devDependencies": {
+    "@types/convict": "^6.1.6",
+    "convict": "^6.2.4",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-jsdoc": "^50.6.9",
     "eslint-plugin-prettier": "^5.2.6",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.30.1"
+    "typescript-eslint": "^8.30.1",
+    "zod": "^4.1.11"
   }
 }

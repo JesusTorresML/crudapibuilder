@@ -10,6 +10,7 @@ import type { IndexDescription, FindOneAndUpdateOptions } from "mongodb";
 
 import type { IRepository, Query } from "#root/domain/mongo.interface";
 import type { MongoDocument } from "#root/domain/models/mongodocument";
+import type { WinstonLogger } from "../logger";
 
 /**
  * Configuration for unique fields in the repository
@@ -29,7 +30,8 @@ export interface UniqueFieldConfig<T> {
 export class MongoDbRepository<T extends Document> implements IRepository<T> {
   protected readonly collection: Collection<MongoDocument<T>>;
   private readonly collectionName: string;
-  private readonly uniqueFields: UniqueFieldConfig<T>[];
+  private readonly uniqueFields: (keyof T)[] | undefined;
+  private readonly logger: WinstonLogger;
   #db: Db;
 
   /**
@@ -43,12 +45,14 @@ export class MongoDbRepository<T extends Document> implements IRepository<T> {
     mongoClient: MongoClient,
     dbName: string,
     collectionName: string,
-    uniqueFields: UniqueFieldConfig<T>[] = [],
+    uniqueFields: (keyof T)[] | undefined,
+    logger: WinstonLogger,
   ) {
     this.collectionName = collectionName;
     this.uniqueFields = uniqueFields;
     this.#db = mongoClient.db(dbName);
     this.collection = this.#db.collection<MongoDocument<T>>(collectionName);
+    this.logger = logger;
   }
 
   /**
@@ -76,10 +80,14 @@ export class MongoDbRepository<T extends Document> implements IRepository<T> {
    */
   private async createIndexes(): Promise<void> {
     // Only create explicit unique indexes for configured fields.
+
+    if (!this.uniqueFields) {
+      return;
+    }
     const indexes: IndexDescription[] = this.uniqueFields.map((config) => ({
-      key: { [config.fieldName as string]: 1 },
+      key: { [config]: 1 },
       unique: true,
-      name: `idx_unique_${String(config.fieldName)}`,
+      name: `idx_unique_${String(config)}`,
     }));
 
     if (indexes.length > 0) {
@@ -104,10 +112,14 @@ export class MongoDbRepository<T extends Document> implements IRepository<T> {
     data: Partial<T>,
     excludeId?: ObjectId,
   ): Promise<boolean> {
+    if (!this.uniqueFields) {
+      return true;
+    }
+
     for (const config of this.uniqueFields) {
-      const fieldValue = data[config.fieldName];
+      const fieldValue = data[config];
       if (fieldValue !== undefined) {
-        const base = { [config.fieldName as string]: fieldValue };
+        const base = { [config as string]: fieldValue };
 
         const query = excludeId ? { ...base, _id: { $ne: excludeId } } : base;
 
@@ -128,9 +140,7 @@ export class MongoDbRepository<T extends Document> implements IRepository<T> {
    */
   public async create(data: T): Promise<MongoDocument<T> | null> {
     // Validate unique fields before creating
-    const validationStatus: boolean = await this.validateUniqueDoc(
-      data as Partial<T>,
-    );
+    const validationStatus: boolean = await this.validateUniqueDoc(data);
 
     if (!validationStatus) {
       return null;
@@ -176,9 +186,7 @@ export class MongoDbRepository<T extends Document> implements IRepository<T> {
    * @param {string} id - The ID of the entity to retrieve
    * @returns {Promise<T | null>} The found entity or null if not found
    */
-  public async read(
-    id: string,
-  ): Promise<MongoDocument<MongoDocument<T>> | null> {
+  public async read(id: string): Promise<MongoDocument<T> | null> {
     let objectId: ObjectId;
     try {
       objectId = new ObjectId(id);

@@ -10,6 +10,7 @@
 import { MongoClient } from "mongodb";
 import { MongoDbRepository } from "../infrastructure/persistance/mongorepo.js";
 import type { MongoDocument } from "#root/domain/models/mongodocument.js";
+import { WinstonLogger } from "#root/infrastructure/logger/winston.logger.js";
 
 /**
  * User domain entity
@@ -31,15 +32,15 @@ async function run(): Promise<void> {
     await client.connect();
     console.log("✅ Connected to MongoDB");
 
+    const logger: WinstonLogger = new WinstonLogger();
+
     // 2. Initialize repository
     const userRepo = new MongoDbRepository<User>(
       client,
       "test_mongorepo", // database
       "users", // collection
-      [
-        { fieldName: "email", errorMessage: "Email already registered" },
-        { fieldName: "username", errorMessage: "Username already taken" },
-      ],
+      ["email", "username"],
+      logger,
     );
 
     // 3. Ensure collection + indexes

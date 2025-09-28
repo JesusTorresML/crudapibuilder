@@ -1,4 +1,5 @@
 import type { DeleteResult } from "mongodb";
+import type { MongoDocument } from "./models/mongodocument";
 
 /**
  * @type {Query<E>}
@@ -12,10 +13,10 @@ export type Query<E> = Partial<E>;
  * @template E - The type of the Domain Entity.
  */
 export interface IRepository<T> {
-  create(data: T): Promise<T | null>;
-  read(id: string): Promise<T | null>;
-  update(id: string, data: Partial<T>): Promise<T | null>;
+  create(data: T): Promise<MongoDocument<T> | null>;
+  read(id: string): Promise<MongoDocument<T> | null>;
+  update(id: string, data: Partial<T>): Promise<MongoDocument<T> | null>;
   remove(id: string): Promise<DeleteResult>;
-  find(query: Query<T>): Promise<T[]>;
-  findOne(query: Query<T>): Promise<T | null>;
+  find(query: Query<T>): Promise<MongoDocument<T>[]>;
+  findOne(query: Query<T>): Promise<MongoDocument<T> | null>;
 }
