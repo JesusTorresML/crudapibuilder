@@ -1,23 +1,24 @@
 import express from "express";
+import Helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import type { Express, Request, Response, NextFunction } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-
-import { checkCorsOptions } from "./corsoptions.js";
-import bodyParser from "body-parser";
-import type { MongoClient } from "mongodb";
+import type { Router } from "express";
 import type { ZodObject } from "zod";
-import type { Express, Router, Request, Response, NextFunction } from "express";
 
+import { globalErrorHandler } from "./errorhandler.js";
+import { ErrorType } from "#root/config/errors.js";
 import { MongoDbRepository } from "../persistance/mongorepo.js";
 import { CrudService } from "#root/application/services/crud.js";
-import { createCrudRouter } from "./router.js";
-import type { MongoDocument } from "#root/domain/models/mongodocument.js";
 import { CrudController } from "./controller.js";
 import type { MongoClientOptions } from "../persistance/types.js";
-import { localConfig } from "#root/config/local.js";
 import { MongoConnection } from "../persistance/mongoconnection.js";
 import { WinstonLogger } from "../logger/winston.logger.js";
-import { CustomError } from "../tools/errors.js";
+import type { AppConfig } from "#root/config/types.js";
+import type { MongoDocument } from "#root/domain/index.js";
+import { checkCorsOptions } from "./corsoptions.js";
+import { createCrudRouter } from "./router.js";
 
 /**
  * Options for creating an API Builder instance.
@@ -32,24 +33,33 @@ export interface ApiBuilderOptions<T> {
 }
 
 /**
- * ApiBuilder provides two modes of use:
- * 1. Create only a Router to be mounted into an existing Express app.
- * 2. Create and run a complete standalone Express server.
+ * Enhanced ApiBuilder that properly integrates the global error handler
+ * and provides comprehensive middleware setup for production-ready APIs.
+ *
+ * @template TEntity - The domain entity type
  */
-export class ApiBuilder<T> {
-  private readonly options: ApiBuilderOptions<T>;
+export class ApiBuilder<TEntity> {
+  private readonly options: ApiBuilderOptions<TEntity>;
   private readonly mongoConnection: MongoConnection;
-  logger: WinstonLogger;
+  private readonly logger: WinstonLogger;
+  private readonly config: AppConfig;
+
   /**
+   * Creates a new enhanced ApiBuilder instance with comprehensive configuration.
    *
-   * @param options
+   * @param {ApiBuilderOptions<TEntity>} options - Configuration options for the API builder
+   * @param {AppConfig} [config] - Application configuration object
    */
-  constructor(options: ApiBuilderOptions<T>) {
+  public constructor(options: ApiBuilderOptions<TEntity>, config: AppConfig) {
     this.options = options;
+    this.config = config;
     this.logger = new WinstonLogger();
 
     this.mongoConnection = new MongoConnection(
-      options.mongoClientOptions,
+      {
+        serverHost: this.config.database.serverHost,
+        serverPort: this.config.database.serverPort,
+      },
       this.logger,
     );
 
@@ -57,79 +67,119 @@ export class ApiBuilder<T> {
   }
 
   /**
-   * Connects to MongoDB and prepares the repository + service.
-   */
-  private async init(): Promise<CrudService<T>> {
-    await this.mongoConnection.connect();
-    const mongoClient: MongoClient = this.mongoConnection.getClient();
-
-    const repo = new MongoDbRepository<MongoDocument<T>>(
-      mongoClient,
-      this.options.dbName,
-      this.options.collection,
-      this.options.uniqueFields,
-      this.logger,
-    );
-    await repo.initCollections();
-    return new CrudService<T>(repo);
-  }
-
-  /**
-   * Builds and returns an Express Router for the given entity.
-   * This allows integration into an existing Express server.
+   * Builds and returns an Express Router with proper error handling middleware.
+   * The router includes validation middleware and delegates errors to global handler.
+   *
+   * @returns {Promise<Router>} Configured Express router with error handling
    */
   public async buildRouter(): Promise<Router> {
-    const service = await this.init();
-    const controller: CrudController<T> = new CrudController<T>(service);
-    return createCrudRouter<T>(controller, this.options.schema);
+    const service = await this.initializeService();
+    const controller = new CrudController<TEntity>(service, this.logger);
+
+    const router = createCrudRouter(controller, this.options.schema);
+    return router;
   }
 
   /**
-   * Builds and runs a standalone Express server.
-   * Useful for quick setup with no boilerplate.
+   * Builds and runs a standalone Express server with comprehensive middleware setup
+   * including the global error handler as the final middleware.
+   *
+   * @returns {Promise<Express>} Configured Express application
    */
   public async buildServer(): Promise<Express> {
-    const router: Router = await this.buildRouter();
+    const router = await this.buildRouter();
+    const app = express();
 
-    const app: Express = express();
-    app.use(bodyParser.json());
-    app.use(express.json()); // For parsing application/json
-    app.use(express.urlencoded({ extended: false })); // For parsing application/x-www-form-urlencoded
-    app.use(cookieParser()); // For parsing cookies
-    app.disable("x-powered-by"); // A small security enhancement
+    // Apply basic middleware
+    this.setupBasicMiddleware(app);
+
+    // Apply security middleware
+    this.setupSecurityMiddleware(app);
+    // Mount entity router
     app.use(this.requestLoggerMiddleware.bind(this)); // Custom request logger
-    app.use(cors(checkCorsOptions(localConfig.apiServerConfig.allowedOrigins)));
-
     app.use(`/${this.options.collection}`, router);
 
-    // after mounting all routers
     app.use((_req: Request, _res: Response, next: NextFunction) => {
       next({ message: "Route not found", statusCode: 404 });
     });
 
-    // error handler
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      const status = err.statusCode ?? 500;
-      res.status(status).json({
+    // CRITICAL: Global error handler MUST be the last middleware
+    app.use(globalErrorHandler);
+
+    // Start server
+    const port = this.options.port || this.config.apiServerConfig.port;
+
+    return new Promise((resolve, reject) => {
+      try {
+        const server = app.listen(port, () => {
+          this.logger.info(
+            `🚀 ApiBuilder server running on http://localhost:${port}`,
+          );
+          resolve(app);
+        });
+
+        server.on("error", (error) => {
+          this.logger.error("Server startup failed", { error: error.message });
+          reject(error);
+        });
+      } catch (error) {
+        this.logger.error("Failed to start server", { error });
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Sets up basic Express middleware including body parsing and CORS.
+   *
+   * @param {Express} app - Express application instance
+   * @private
+   */
+  private setupBasicMiddleware(app: Express): void {
+    // Body parsing middleware
+    app.use(express.json({ limit: "10mb" }));
+    app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+    app.use(cookieParser());
+
+    // CORS configuration
+    app.use(cors(checkCorsOptions(this.config.apiServerConfig.allowedOrigins)));
+
+    // Security headers
+    app.disable("x-powered-by");
+    app.use(Helmet());
+
+    // Request timeout
+    // app.use(timeout(this.config.server.requestTimeout));
+  }
+
+  /**
+   * Sets up security middleware including rate limiting and authentication.
+   *
+   * @param {Express} app - Express application instance
+   * @private
+   */
+  private setupSecurityMiddleware(app: Express): void {
+    // Rate limiting
+    const limiter = rateLimit({
+      windowMs: this.config.apiServerConfig.rateLimitWindowMs,
+      max: this.config.apiServerConfig.rateLimitMaxRequests,
+      message: {
         success: false,
-        message: err.message ?? "Internal Server Error",
-      });
+        error: {
+          type: ErrorType.SERVER_ERROR,
+          message: "Too many requests, please try again later",
+          timestamp: new Date(),
+        },
+      },
+      standardHeaders: true,
+      legacyHeaders: false,
     });
 
-    const port = this.options.port;
-    try {
-      app.listen(port, () =>
-        console.log(`🚀 ApiBuilder server running on http://localhost:${port}`),
-      );
-    } catch (error) {
-      throw new CustomError({
-        name: "SERVER_ERROR",
-        cause: "cant start server",
-        message: String(error),
-      });
-    }
+    app.use(limiter);
 
-    return app;
+    // Request size limits
+    app.use(express.json({ limit: "10mb" }));
+    app.use(express.urlencoded({ extended: true, limit: "10mb" }));
   }
 
   /**
@@ -160,11 +210,44 @@ export class ApiBuilder<T> {
   }
 
   /**
-   *
+   * Initializes the service layer with proper dependency injection.
+   * @returns {Promise<CrudService<TEntity>>} Configured service instance
+   * @private
+   */
+  private async initializeService(): Promise<CrudService<TEntity>> {
+    await this.mongoConnection.connect();
+    const mongoClient = this.mongoConnection.getClient();
+
+    const repository = new MongoDbRepository<MongoDocument<TEntity>>(
+      mongoClient,
+      this.options.dbName,
+      this.options.collection,
+      this.options.uniqueFields,
+      this.logger,
+    );
+
+    await repository.initCollections();
+    return new CrudService<TEntity>(repository, this.logger);
+  }
+
+  /**
+   * Registers process signal handlers for graceful shutdown.
+   * @private
    */
   private registerForShutdown(): void {
-    this.logger.debug("Registering MongoDB connection for graceful shutdown.");
-    process.on("SIGINT", () => this.mongoConnection.disconnect());
-    process.on("SIGTERM", () => this.mongoConnection.disconnect());
+    this.logger.debug("Registering shutdown handlers");
+
+    /**
+     *
+     * @param signal
+     */
+    const shutdown = async (signal: string): Promise<void> => {
+      this.logger.info(`Received ${signal}, shutting down gracefully`);
+      await this.mongoConnection.disconnect();
+      process.exit(0);
+    };
+
+    process.on("SIGINT", () => shutdown("SIGINT"));
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
   }
 }

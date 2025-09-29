@@ -14,6 +14,8 @@ export type ApiServerConfig = {
   hostname: string;
   port: string;
   allowedOrigins: string[];
+  rateLimitWindowMs: number;
+  rateLimitMaxRequests: number;
 };
 
 // ----------------------------------------------------------

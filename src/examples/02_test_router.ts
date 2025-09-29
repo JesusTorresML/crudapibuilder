@@ -12,16 +12,19 @@ type Product = { name: string; price: number };
 const app = express();
 
 (async () => {
-  const builder = new ApiBuilder<Product>({
-    mongoClientOptions: {
-      serverHost: localConfig.database.serverHost,
-      serverPort: localConfig.database.serverPort,
+  const builder = new ApiBuilder<Product>(
+    {
+      mongoClientOptions: {
+        serverHost: localConfig.database.serverHost,
+        serverPort: localConfig.database.serverPort,
+      },
+      dbName: "mydb",
+      collection: "products",
+      schema: ProductSchema,
+      uniqueFields: ["name"],
     },
-    dbName: "mydb",
-    collection: "products",
-    schema: ProductSchema,
-    uniqueFields: ["name"],
-  });
+    localConfig,
+  );
 
   const productRouter = await builder.buildRouter();
   app.use("/products", productRouter);

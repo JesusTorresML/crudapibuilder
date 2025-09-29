@@ -2,15 +2,16 @@ import { CustomError } from "../tools/errors.js";
 import type { CorsOptions } from "cors";
 
 /**
- *
+ * Configure corsOptions from allowed Origins.
  * @param allowedOrigins
+ * @returns {CorsOptions} - CorsOptions.
  */
 export function checkCorsOptions(allowedOrigins: string[]): CorsOptions {
   return {
     /**
      *
-     * @param origin
-     * @param callback
+     * @param {string} origin - Origin.
+     * @param {CallableFunction} callback - Callback.
      */
     origin: (
       origin: string | undefined,

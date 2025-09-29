@@ -63,16 +63,19 @@ async function run(): Promise<void> {
     });
     console.log("Duplicate create (expected null):", u2);
 
-    // 6. Update user (try invalid and valid IDs)
-    const updatedInvalid = await userRepo.update(
-      "INVALID_ID", // invalid ObjectId string
-      { username: "johnny" },
-    );
-    console.log("Update with invalid id (expected null):", updatedInvalid);
+    try {
+      // 6. Update user (try invalid and valid IDs)
+      const updatedInvalid = await userRepo.update(
+        "INVALID_ID", // invalid ObjectId string
+        { username: "johnny" },
+      );
+      console.log("Update with invalid id (expected null):", updatedInvalid);
+    } catch {}
 
     if (u1) {
-      const userFind: MongoDocument<User> | null =
-        await userRepo.findByUniqueField("email", "jdoe@mail.com");
+      const userFind: MongoDocument<User> | null = await userRepo.findOne({
+        email: "jdoe@mail.com",
+      });
 
       if (userFind !== null) {
         const updatedValid = await userRepo.update(userFind._id, {
@@ -83,17 +86,14 @@ async function run(): Promise<void> {
     }
 
     // 7. Query by unique field
-    const found = await userRepo.findByUniqueField("email", "jdoe@mail.com");
+    const found = await userRepo.find({ email: "jdoe@mail.com" });
     console.log("Found by email:", found);
 
     // 8. Delete user
     if (u1) {
       // ⚠️ The repository returns plain domain entity without _id.
       // For demo, we re-fetch the user to get the id.
-      const existing = await userRepo.findByUniqueField(
-        "email",
-        "jdoe@mail.com",
-      );
+      const existing = await userRepo.findOne({ email: "jdoe@mail.com" });
       if (existing?._id) {
         await userRepo.remove(existing._id.toString());
         console.log("✅ User removed");

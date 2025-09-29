@@ -17,11 +17,21 @@ function log(title, data) {
 
 /** Run sequential test requests */
 async function run() {
+
+  // 1. Create a product
+  let res_invprod = await fetch(BASE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Laptop" }),
+  });
+  let created_inv = await res_invprod.json();
+  log("Created Invalid Product", created_inv);
+
   // 1. Create a product
   let res = await fetch(BASE_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: "Laptop", price: "1200" }),
+    body: JSON.stringify({ name: "Laptop", price: 1200 }),
   });
   let created = await res.json();
   log("Created Product", created);
@@ -35,6 +45,11 @@ async function run() {
   const duplicate = await res.json();
   log("Duplicate Product Attempt", duplicate);
 
+  // 4. Get RANDOM product by ID
+  res = await fetch(`${BASE_URL}/random ?? "???"}`);
+  const random = await res.json();
+  log("Get by RandomID", random);
+
   // 3. Get all products
   res = await fetch(BASE_URL);
   const list = await res.json();
@@ -45,12 +60,12 @@ async function run() {
   log("Find Products", find);
 
   // 4. Get product by ID
-  res = await fetch(`${BASE_URL}/${created._id ?? "???"}`);
+  res = await fetch(`${BASE_URL}/${created.data._id ?? "???"}`);
   const single = await res.json();
   log("Get by ID", single);
 
   // 5. Update product
-  res = await fetch(`${BASE_URL}/${created._id ?? "???"}`, {
+  res = await fetch(`${BASE_URL}/${created.data._id ?? "???"}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ price: 999 }),
@@ -59,10 +74,17 @@ async function run() {
   log("Updated Product", updated);
 
   // 6. Delete product
-  res = await fetch(`${BASE_URL}/${created._id ?? "???"}`, {
+  res = await fetch(`${BASE_URL}/${created.data._id ?? "???"}`, {
     method: "DELETE",
   });
-  log("Delete Response", { status: res.status });
+  const deleted = await res.json();
+  log("Delete Response", deleted);
+
+  res = await fetch(`${BASE_URL}/randomid ?? "???"}`, {
+    method: "DELETE",
+  });
+  const deletedRand = await res.json();
+  log("Delete Random Response", deletedRand);
 
   // 7. Final check: products should be empty
   res = await fetch(BASE_URL);

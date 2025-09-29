@@ -1,6 +1,6 @@
 import type { ObjectId } from "mongodb";
 
-export type MongoDocument<T> = T & {
+export type MongoDocument<TEntity> = TEntity & {
   _id: ObjectId;
   createdAt: Date;
 };

@@ -19,6 +19,8 @@ export const configSchema: Schema<AppConfig> = {
       default: "1234",
     },
     allowedOrigins: ["http://localhost", "http://localhost:1234"],
+    rateLimitWindowMs: 300,
+    rateLimitMaxRequests: 100,
   },
 
   database: {

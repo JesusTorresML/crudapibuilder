@@ -4,9 +4,9 @@ import type { ZodObject } from "zod";
 import { validationMiddleware } from "./middleware.js";
 
 /**
- *
- * @param controller
- * @param schema
+ * Generic CRUD Router.
+ * @param {CrudController<T>} controller - Crud Controller
+ * @param {ZodObject<any>} schema - Zod Schema.
  */
 export function createCrudRouter<T>(
   controller: CrudController<T>,
@@ -17,7 +17,10 @@ export function createCrudRouter<T>(
   // Create
   router.post(
     "/",
-    validationMiddleware<T>(schema),
+    validationMiddleware<T>(schema, {
+      allowUnknownFields: false,
+      strictMode: false,
+    }),
     controller.create.bind(controller),
   );
 

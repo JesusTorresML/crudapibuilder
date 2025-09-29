@@ -2,15 +2,6 @@ import { z } from "zod";
 import type { SchemaDef } from "./types.js";
 
 /**
- * Utility: determines if a field should be required.
- * @param f
- * @param f.required
- */
-function isRequired(f?: { required?: boolean }): boolean {
-  return f?.required !== false;
-}
-
-/**
  * Wraps a Zod schema with `.optional()` and/or `.default()`.
  * @param schema
  * @param required
@@ -23,10 +14,10 @@ function withOptionalAndDefault<T extends z.ZodTypeAny>(
 ): z.ZodTypeAny {
   let out: z.ZodTypeAny = schema;
   if (required === false) {
-    out = (out as any).optional();
+    out = out.optional();
   }
   if (def !== undefined) {
-    out = (out as any).default(def);
+    out = out.default(def);
   }
   return out;
 }

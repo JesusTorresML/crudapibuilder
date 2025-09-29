@@ -1,73 +1,73 @@
-import { ObjectId, MongoServerError } from "mongodb";
 import type {
-  DeleteResult,
-  OptionalUnlessRequiredId,
+  Collection,
   Db,
+  Document,
+  Filter,
+  FindOptions,
+  MongoClient,
+  OptionalUnlessRequiredId,
+  IndexDescription,
   CollectionInfo,
 } from "mongodb";
-import type { Collection, Document, Filter, MongoClient } from "mongodb";
-import type { IndexDescription, FindOneAndUpdateOptions } from "mongodb";
-
-import type { IRepository, Query } from "#root/domain/mongo.interface";
+import { ObjectId, MongoServerError } from "mongodb";
+import type { IRepository } from "#root/domain/index.js";
+import { ValidationError, ApplicationError } from "#root/config/errors.js";
+import { ErrorType } from "#root/config/errors.js";
+import type { Logger } from "#root/domain/logger.interface";
 import type { MongoDocument } from "#root/domain/models/mongodocument";
-import type { WinstonLogger } from "../logger";
+import type { PaginatedResult, PaginationOptions } from "#root/domain/index.js";
 
 /**
- * Configuration for unique fields in the repository
+ * Enhanced MongoDB repository with proper error handling that integrates
+ * seamlessly with the global error handler pattern.
+ *
+ * @template TEntity The domain entity type.
+ * @template TQuery The query type for filtering entities.
  */
-export interface UniqueFieldConfig<T> {
-  /** The field name that should be unique */
-  fieldName: keyof T;
-  /** Optional custom error message for duplicate violations */
-  errorMessage?: string;
-}
-
-/**
- * A generic MongoDB repository implementation that handles CRUD operations.
- * @template T - The Domain Entity type
- * @implements {IRepository<T>}
- */
-export class MongoDbRepository<T extends Document> implements IRepository<T> {
-  protected readonly collection: Collection<MongoDocument<T>>;
+export class MongoDbRepository<TEntity extends Document>
+  implements IRepository<TEntity>
+{
+  protected readonly collection: Collection<MongoDocument<TEntity>>;
   private readonly collectionName: string;
-  private readonly uniqueFields: (keyof T)[] | undefined;
-  private readonly logger: WinstonLogger;
-  #db: Db;
+  private readonly uniqueFields: (keyof TEntity)[] | undefined;
+  private readonly logger: Logger;
+  private readonly db: Db;
 
   /**
-   * Creates a new MongoDB repository instance.
-   * @param {MongoClient} mongoClient - The MongoDB client instance
-   * @param {string} dbName - The name of the database to use
-   * @param {string} collectionName - The name of the collection to use
-   * @param {UniqueFieldConfig<T>[]} uniqueFields - Array of fields that should be unique
+   *
+   * @param {MongoClient} mongoClient - Mongoclient
+   * @param {string} dbName - Database Name
+   * @param {string} collectionName - Collection Name
+   * @param {(keyof TEntity)[] | undefined} uniqueFields - Unique field to setup indexes
+   * @param {Logger} logger - Winston logger instance
    */
   public constructor(
     mongoClient: MongoClient,
     dbName: string,
     collectionName: string,
-    uniqueFields: (keyof T)[] | undefined,
-    logger: WinstonLogger,
+    uniqueFields: (keyof TEntity)[] | undefined,
+    logger: Logger,
   ) {
     this.collectionName = collectionName;
     this.uniqueFields = uniqueFields;
-    this.#db = mongoClient.db(dbName);
-    this.collection = this.#db.collection<MongoDocument<T>>(collectionName);
+    this.db = mongoClient.db(dbName);
+    this.collection =
+      this.db.collection<MongoDocument<TEntity>>(collectionName);
     this.logger = logger;
   }
-
   /**
    * Initializes the repository collection and creates indexes if it doesn't exist.
    * @returns {Promise<boolean>} True if the collection was created, false if it already existed
    */
   public async initCollections(): Promise<boolean> {
-    const collectionsList: CollectionInfo[] = await this.#db
+    const collectionsList: CollectionInfo[] = await this.db
       .listCollections({ name: this.collectionName })
       .toArray();
 
     const isNewCollection = collectionsList.length === 0;
 
     if (isNewCollection) {
-      await this.#db.createCollection(this.collectionName);
+      await this.db.createCollection(this.collectionName);
     }
 
     await this.createIndexes();
@@ -103,210 +103,484 @@ export class MongoDbRepository<T extends Document> implements IRepository<T> {
       }
     }
   }
+  /**
+   * Creates a new entity with comprehensive error handling.
+   * Throws structured errors that are handled by the global error handler.
+   *
+   * @param {TEntity} data - Entity data to create
+   * @returns {Promise<MongoDocument<TEntity> | null>} Created entity or null if duplicate
+   * @throws {ApplicationError} When database operation fails
+   */
+  public async create(data: TEntity): Promise<MongoDocument<TEntity> | null> {
+    try {
+      // Validate unique constraints before creation
+      const isValid = await this.validateUniqueConstraints(data);
+      if (!isValid) {
+        // Return null for duplicate detection (business logic decision)
+        this.logger.warn(
+          "Create operation failed: duplicate constraint violation",
+          {
+            data,
+            uniqueFields: this.uniqueFields,
+          },
+        );
+        return null;
+      }
+
+      const document: MongoDocument<TEntity> = {
+        _id: new ObjectId(),
+        createdAt: new Date(),
+        ...data,
+      };
+
+      await this.collection.insertOne(
+        document as OptionalUnlessRequiredId<MongoDocument<TEntity>>,
+      );
+
+      this.logger.debug("Entity created successfully", {
+        entityId: document._id,
+        collectionName: this.collectionName,
+      });
+
+      return document;
+    } catch (error) {
+      this.logger.error("Create operation failed", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        data,
+        collectionName: this.collectionName,
+      });
+
+      // Handle MongoDB duplicate key errors
+      if (error instanceof MongoServerError && error.code === 11000) {
+        throw new ApplicationError({
+          type: ErrorType.DUPLICATE_ERROR,
+          message: "Duplicate value detected",
+          statusCode: 409,
+          metadata: {
+            duplicateField: this.extractDuplicateField(error.message),
+            collectionName: this.collectionName,
+            operation: "create",
+          },
+        });
+      }
+
+      // Handle other database errors
+      throw new ApplicationError({
+        type: ErrorType.DATABASE_ERROR,
+        message: "Database operation failed during entity creation",
+        statusCode: 500,
+        metadata: {
+          operation: "create",
+          collectionName: this.collectionName,
+          originalError:
+            error instanceof Error ? error.message : "Unknown error",
+        },
+        cause: error instanceof Error ? error : new Error(String(error)),
+      });
+    }
+  }
 
   /**
-   * Validates that unique fields don't already exist in the database.
+   * Reads an entity by ID with proper error handling.
+   *
+   * @param {string} id - Entity identifier
+   * @returns {Promise<MongoDocument<TEntity> | null>} Found entity or null
+   * @throws {ApplicationError} When database operation fails
+   */
+  public async read(id: string): Promise<MongoDocument<TEntity> | null> {
+    try {
+      let objectId: ObjectId;
+
+      // Validate ObjectId format
+      try {
+        objectId = new ObjectId(id);
+      } catch {
+        throw new ValidationError({
+          message: "Invalid entity identifier format",
+          field: "id",
+          violations: ["ID must be a valid MongoDB ObjectId format"],
+        });
+      }
+
+      const document = await this.collection.findOne({
+        _id: objectId,
+      } as Filter<MongoDocument<TEntity>>);
+
+      if (document) {
+        this.logger.debug("Entity retrieved successfully", {
+          entityId: objectId,
+          collectionName: this.collectionName,
+        });
+      }
+
+      return document as MongoDocument<TEntity> | null;
+    } catch (error) {
+      // Re-throw validation errors as-is
+      if (error instanceof ValidationError) {
+        throw error;
+      }
+
+      this.logger.error("Read operation failed", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        id,
+        collectionName: this.collectionName,
+      });
+
+      throw new ApplicationError({
+        type: ErrorType.DATABASE_ERROR,
+        message: "Database operation failed during entity retrieval",
+        statusCode: 500,
+        metadata: {
+          operation: "read",
+          entityId: id,
+          collectionName: this.collectionName,
+          originalError:
+            error instanceof Error ? error.message : "Unknown error",
+        },
+        cause: error instanceof Error ? error : new Error(String(error)),
+      });
+    }
+  }
+
+  /**
+   * Updates an entity with comprehensive error handling.
+   *
+   * @param {string} id - Entity identifier
+   * @param {Partial<TEntity>} data - Update data
+   * @returns {Promise<MongoDocument<TEntity> | null>} Updated entity or null if not found
+   * @throws {ApplicationError} When database operation fails
+   */
+  public async update(
+    id: string | ObjectId,
+    data: Partial<TEntity>,
+  ): Promise<MongoDocument<TEntity> | null> {
+    try {
+      let objectId: ObjectId;
+
+      // Validate ObjectId format
+      try {
+        objectId = typeof id === "string" ? new ObjectId(id) : id;
+      } catch {
+        throw new ValidationError({
+          message: "Invalid entity identifier format",
+          field: "id",
+          violations: ["ID must be a valid MongoDB ObjectId format"],
+        });
+      }
+
+      // Validate unique constraints for update
+      const isValid = await this.validateUniqueConstraints(data, objectId);
+      if (!isValid) {
+        throw new ApplicationError({
+          type: ErrorType.DUPLICATE_ERROR,
+          message: "Update would violate unique constraint",
+          statusCode: 409,
+          metadata: {
+            entityId: id,
+            updateData: data,
+            uniqueFields: this.uniqueFields,
+            operation: "update",
+          },
+        });
+      }
+
+      const result = await this.collection.findOneAndUpdate(
+        { _id: objectId } as Filter<MongoDocument<TEntity>>,
+        { $set: data as Partial<MongoDocument<TEntity>> },
+        { returnDocument: "after" },
+      );
+
+      if (result) {
+        this.logger.debug("Entity updated successfully", {
+          entityId: objectId,
+          collectionName: this.collectionName,
+          updatedFields: Object.keys(data),
+        });
+      }
+
+      return result as MongoDocument<TEntity> | null;
+    } catch (error) {
+      // Re-throw application errors as-is
+      if (
+        error instanceof ApplicationError ||
+        error instanceof ValidationError
+      ) {
+        throw error;
+      }
+
+      this.logger.error("Update operation failed", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        id,
+        data,
+        collectionName: this.collectionName,
+      });
+
+      // Handle MongoDB duplicate key errors
+      if (error instanceof MongoServerError && error.code === 11000) {
+        throw new ApplicationError({
+          type: ErrorType.DUPLICATE_ERROR,
+          message: "Update would create duplicate value",
+          statusCode: 409,
+          metadata: {
+            duplicateField: this.extractDuplicateField(error.message),
+            entityId: id,
+            operation: "update",
+          },
+        });
+      }
+
+      throw new ApplicationError({
+        type: ErrorType.DATABASE_ERROR,
+        message: "Database operation failed during entity update",
+        statusCode: 500,
+        metadata: {
+          operation: "update",
+          entityId: id,
+          collectionName: this.collectionName,
+          originalError:
+            error instanceof Error ? error.message : "Unknown error",
+        },
+        cause: error instanceof Error ? error : new Error(String(error)),
+      });
+    }
+  }
+
+  /**
+   * Validates unique field constraints before database operations.
+   *
+   * @param {Partial<TEntity>} data - Data to validate
+   * @param {ObjectId} [excludeId] - ID to exclude from uniqueness check (for updates)
+   * @returns {Promise<boolean>} True if valid, false if constraint violation
    * @private
    */
-  private async validateUniqueDoc(
-    data: Partial<T>,
+  private async validateUniqueConstraints(
+    data: Partial<TEntity>,
     excludeId?: ObjectId,
   ): Promise<boolean> {
     if (!this.uniqueFields) {
       return true;
     }
 
-    for (const config of this.uniqueFields) {
-      const fieldValue = data[config];
-      if (fieldValue !== undefined) {
-        const base = { [config as string]: fieldValue };
-
-        const query = excludeId ? { ...base, _id: { $ne: excludeId } } : base;
-
-        const existing = await this.collection.findOne(
-          query as Filter<MongoDocument<T>>,
-        );
-        if (existing) return false;
-      }
-    }
-    return true;
-  }
-
-  /**
-   * Creates a new entity in the database.
-   * NOTE: Signature matches IRepository<T>: expects a plain domain entity.
-   * @param {T} data - The domain entity data to persist
-   * @returns {Promise<T>} The created entity (domain-shape only)
-   */
-  public async create(data: T): Promise<MongoDocument<T> | null> {
-    // Validate unique fields before creating
-    const validationStatus: boolean = await this.validateUniqueDoc(data);
-
-    if (!validationStatus) {
-      return null;
-    }
-
-    // Build a full Mongo document with id and timestamp
-    const document: MongoDocument<T> = {
-      _id: new ObjectId(),
-      createdAt: new Date(),
-      ...data,
-    };
-
     try {
-      // insertOne accepts OptionalUnlessRequiredId<MongoDocument<T>>,
-      // passing a fully built MongoDocument<T> is compatible.
-      await this.collection.insertOne(
-        document as OptionalUnlessRequiredId<MongoDocument<T>>,
-      );
-    } catch (error) {
-      if (error instanceof MongoServerError && error.code === 11000) {
-        const duplicateField = this.extractDuplicateField(error.message);
-        throw new Error(
-          `Duplicate value detected for field: ${duplicateField}`,
-        );
+      for (const fieldName of this.uniqueFields) {
+        const fieldValue = data[fieldName];
+        if (fieldValue === undefined) {
+          continue;
+        }
+
+        const query: any = { [fieldName]: fieldValue };
+        if (excludeId) {
+          query._id = { $ne: excludeId };
+        }
+
+        const existing = await this.collection.findOne(query);
+        if (existing) {
+          this.logger.warn("Unique constraint violation detected", {
+            field: fieldName,
+            value: fieldValue,
+            existingId: existing._id,
+            excludeId,
+          });
+          return false;
+        }
       }
-      throw error;
+      return true;
+    } catch (error) {
+      this.logger.error("Error validating unique constraints", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        data,
+        uniqueFields: this.uniqueFields,
+      });
+      throw new ApplicationError({
+        type: ErrorType.DATABASE_ERROR,
+        message: "Failed to validate unique constraints",
+        statusCode: 500,
+        metadata: {
+          operation: "validateUniqueConstraints",
+          data,
+          uniqueFields: this.uniqueFields,
+        },
+        cause: error instanceof Error ? error : new Error(String(error)),
+      });
     }
-    // Cast through unknown to satisfy TS when T could be a narrower subtype.
-    return document;
   }
 
   /**
-   * Extracts the duplicate field name from MongoDB error message.
+   * Extracts the field name from MongoDB duplicate key error message.
+   *
+   * @param {string} errorMessage - MongoDB error message
+   * @returns {string} Field name that caused the duplicate error
    * @private
    */
   private extractDuplicateField(errorMessage: string): string {
     const match = errorMessage.match(/index:\s+([^\s]+)/);
-    return match ? String(match[1]) : "unknown field";
+    return match?.[1] ?? "unknown_field";
   }
 
   /**
-   * Retrieves an entity by its ID.
-   * @param {string} id - The ID of the entity to retrieve
-   * @returns {Promise<T | null>} The found entity or null if not found
+   * Permanently removes an entity from the persistence layer by its ID.
+   *
+   * @param {string} id - The unique identifier of the entity to remove.
+   * @returns {Promise<boolean>} True if the entity was deleted, false if it was not found.
+   * @throws {ValidationError} If the provided ID is not a valid ObjectId format.
+   * @throws {ApplicationError} When the deletion operation fails for other reasons.
    */
-  public async read(id: string): Promise<MongoDocument<T> | null> {
-    let objectId: ObjectId;
+  public async remove(id: string): Promise<boolean> {
+    this.logger.debug("Repository: Attempting to remove entity", { id });
     try {
-      objectId = new ObjectId(id);
-    } catch {
-      return null;
-    }
-
-    const document = await this.collection.findOne({ _id: objectId } as Filter<
-      MongoDocument<T>
-    >);
-    if (!document) return null;
-    return document as MongoDocument<T>;
-  }
-
-  /**
-   * Updates an existing entity in the database.
-   * @param {string} id - The ID of the entity to update
-   * @param {Partial<T>} data - The partial data to update
-   * @returns {Promise<T>} The updated entity (domain-shape only)
-   */
-  public async update(
-    id: string | ObjectId,
-    data: Partial<T>,
-  ): Promise<MongoDocument<T> | null> {
-    let objectId: ObjectId;
-    try {
-      objectId = typeof id === "string" ? new ObjectId(id) : id;
-    } catch {
-      return null;
-    }
-
-    const validationStatus: boolean = await this.validateUniqueDoc(
-      data,
-      objectId,
-    );
-    if (!validationStatus) return null;
-
-    const filter = { _id: objectId } as Filter<MongoDocument<T>>;
-    const updateDoc = { $set: data as Partial<MongoDocument<T>> };
-
-    try {
-      const options: FindOneAndUpdateOptions = { returnDocument: "after" };
-      const result = await this.collection.findOneAndUpdate(
-        filter,
-        updateDoc,
-        options,
-      );
-
-      if (!result) {
-        return null;
+      let objectId: ObjectId;
+      try {
+        objectId = new ObjectId(id);
+      } catch {
+        throw new ValidationError({
+          message: "Invalid entity identifier format",
+          field: "id",
+        });
       }
-      return result as MongoDocument<T>;
+
+      const result = await this.collection.deleteOne({
+        _id: objectId,
+      } as Filter<MongoDocument<TEntity>>);
+
+      const wasDeleted = result.deletedCount === 1;
+      if (wasDeleted) {
+        this.logger.info("Repository: Entity removed successfully", { id });
+      } else {
+        this.logger.warn("Repository: Entity to remove was not found", { id });
+      }
+
+      return wasDeleted;
     } catch (error) {
-      if (error instanceof MongoServerError && error.code === 11000) {
-        const duplicateField = this.extractDuplicateField(error.message);
-        throw new Error(
-          `Duplicate value detected for field: ${duplicateField}`,
-        );
-      }
-      throw error;
+      if (error instanceof ValidationError) throw error; // Re-throw validation errors
+
+      this.logger.error("Repository: Remove operation failed", { error });
+      throw new ApplicationError({
+        type: ErrorType.DATABASE_ERROR,
+        message: "Database operation failed during entity removal.",
+        cause: error as Error,
+      });
     }
   }
 
   /**
-   * Removes an entity from the database by its ID.
-   * @param {string} id - The ID of the entity to remove
-   * @returns {Promise<void>}
+   * Finds multiple entities matching the specified query criteria with pagination.
+   *
+   * @param {TQuery} query - The query criteria for filtering entities.
+   * @param {PaginationOptions} [options] - Optional pagination and sorting parameters.
+   * @returns {Promise<PaginatedResult<MongoDocument<TEntity>>>} A paginated list of results.
+   * @throws {ApplicationError} When the query operation fails.
    */
-  public async remove(id: string): Promise<DeleteResult> {
-    let objectId: ObjectId;
+  public async find(
+    query: Partial<TEntity>,
+    options: PaginationOptions = {},
+  ): Promise<PaginatedResult<MongoDocument<TEntity>>> {
+    this.logger.debug("Repository: Finding entities with query", {
+      query,
+      options,
+    });
     try {
-      objectId = new ObjectId(id);
-    } catch {
-      throw new Error(`Invalid ObjectId format: ${id}`);
+      // Set default pagination and sorting options
+      const {
+        skip = 0,
+        limit = 20,
+        sortBy = "createdAt",
+        sortOrder = -1,
+      } = options;
+
+      const mongoQuery = query as Filter<MongoDocument<TEntity>>;
+      const findOptions: FindOptions = {
+        skip,
+        limit,
+        sort: { [sortBy]: sortOrder },
+      };
+
+      // Run count and find queries in parallel for efficiency
+      const [total, data] = await Promise.all([
+        this.collection.countDocuments(mongoQuery),
+        this.collection.find(mongoQuery, findOptions).toArray(),
+      ]);
+
+      const hasNext = skip + limit < total;
+      const hasPrevious = skip > 0;
+
+      this.logger.debug("Repository: Find operation successful", {
+        found: data.length,
+        total,
+      });
+
+      return {
+        data: data as MongoDocument<TEntity>[],
+        total,
+        skip,
+        limit,
+        hasNext,
+        hasPrevious,
+      };
+    } catch (error) {
+      this.logger.error("Repository: Find operation failed", { error });
+      throw new ApplicationError({
+        type: ErrorType.DATABASE_ERROR,
+        message: "Database operation failed during entity search.",
+        cause: error as Error,
+      });
     }
+  }
 
-    const filter = { _id: objectId } as Filter<MongoDocument<T>>;
-    const result = await this.collection.deleteOne(filter);
-
-    if (result.deletedCount === 0) {
-      throw new Error(`Entity with id ${id} not found`);
+  /**
+   * Finds the first entity that matches the specified query criteria.
+   *
+   * @param {TQuery} query - The query criteria for finding the entity.
+   * @returns {Promise<MongoDocument<TEntity> | null>} The first matching entity or null if not found.
+   * @throws {ApplicationError} When the query operation fails.
+   */
+  public async findOne(
+    query: Partial<TEntity>,
+  ): Promise<MongoDocument<TEntity> | null> {
+    this.logger.debug("Repository: Finding single entity", { query });
+    try {
+      const document = await this.collection.findOne(
+        query as Filter<MongoDocument<TEntity>>,
+      );
+      if (document) {
+        this.logger.debug("Repository: Single entity found", {
+          id: document._id,
+        });
+      } else {
+        this.logger.debug("Repository: Single entity not found");
+      }
+      return document as MongoDocument<TEntity> | null;
+    } catch (error) {
+      this.logger.error("Repository: FindOne operation failed", { error });
+      throw new ApplicationError({
+        type: ErrorType.DATABASE_ERROR,
+        message: "Database operation failed while finding a single entity.",
+        cause: error as Error,
+      });
     }
-    return result;
   }
 
   /**
-   * Finds multiple entities matching the given query.
-   * @param {Query<T>} query - The query criteria
-   * @returns {Promise<T[]>} An array of matching entities
+   * Counts the total number of entities that match the specified query criteria.
+   *
+   * @param {TQuery} query - The query criteria for counting entities.
+   * @returns {Promise<number>} The total count of matching entities.
+   * @throws {ApplicationError} When the count operation fails.
    */
-  public async find(query: Query<T>): Promise<MongoDocument<T>[]> {
-    const mongoQuery = query as Filter<MongoDocument<T>>;
-    const documents = await this.collection.find(mongoQuery).toArray();
-    return documents as MongoDocument<T>[];
-  }
-
-  /**
-   * Finds a single entity matching the given query.
-   * @param {Query<T>} query - The query criteria
-   * @returns {Promise<T | null>} The first matching entity or null if none found
-   */
-  public async findOne(query: Query<T>): Promise<MongoDocument<T> | null> {
-    const mongoQuery = query as Filter<MongoDocument<T>>;
-    const document = await this.collection.findOne(mongoQuery);
-    if (!document) return null;
-    // const { _id, createdAt, ...domainData } = document;
-    return document as unknown as MongoDocument<T>;
-  }
-
-  /**
-   * Finds an entity by a unique field value.
-   * @param {keyof T} fieldName - The unique field name
-   * @param {unknown} value - The value to search for
-   * @returns {Promise<T | null>} The found entity or null if not found
-   */
-  public async findByUniqueField(
-    fieldName: keyof T,
-    value: unknown,
-  ): Promise<MongoDocument<T> | null> {
-    const query = { [fieldName]: value } as Query<T>;
-    return this.findOne(query);
+  public async count(query: Partial<TEntity>): Promise<number> {
+    this.logger.debug("Repository: Counting entities", { query });
+    try {
+      const count = await this.collection.countDocuments(
+        query as Filter<MongoDocument<TEntity>>,
+      );
+      this.logger.debug("Repository: Count operation successful", { count });
+      return count;
+    } catch (error) {
+      this.logger.error("Repository: Count operation failed", { error });
+      throw new ApplicationError({
+        type: ErrorType.DATABASE_ERROR,
+        message: "Database operation failed during entity count.",
+        cause: error as Error,
+      });
+    }
   }
 }

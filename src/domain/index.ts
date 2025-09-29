@@ -1,4 +1,4 @@
-export * from './models/mongodocument.js';
-export * from './crudservice.interface.js';
-export * from './logger.interface.js';
-export * from './mongo.interface.js';
+export type * from "./models/mongodocument.js";
+export type * from "./crudservice.interface.js";
+export type * from "./logger.interface.js";
+export type * from "./mongo.interface.js";
