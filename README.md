@@ -158,9 +158,6 @@ src/
 
 ## 🧭 Roadmap (ideas)
 
-- Unify error model (`NotFound`, `ValidationError`, `DuplicateError`) + central error handler.
-- Stronger typing for `res.locals` (remove `any`).
-- Improve `createCrudRouter` generics.
 - Generate **OpenAPI/Swagger** from Zod schemas.
 - Add E2E tests with **Supertest**.
 
