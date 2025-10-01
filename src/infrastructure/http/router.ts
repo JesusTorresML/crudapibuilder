@@ -1,16 +1,17 @@
 import { Router } from "express";
 import type { CrudController } from "./controller";
-import type { ZodObject } from "zod";
+import type { ZodObject, ZodType } from "zod";
 import { validationMiddleware } from "./middleware.js";
 
 /**
  * Generic CRUD Router.
  * @param {CrudController<T>} controller - Crud Controller
- * @param {ZodObject<any>} schema - Zod Schema.
+ * @param {ZodObject<Record<string, ZodType>>} schema - Zod Schema.
+ * @returns {Router} Express router with CRUD endpoints
  */
 export function createCrudRouter<T>(
   controller: CrudController<T>,
-  schema: ZodObject<any>,
+  schema: ZodObject<Record<string, ZodType>>,
 ): Router {
   const router: Router = Router();
 

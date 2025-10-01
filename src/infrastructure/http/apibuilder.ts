@@ -5,7 +5,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import type { Router } from "express";
-import type { ZodObject } from "zod";
+import type { ZodObject, ZodType } from "zod";
 
 import { globalErrorHandler } from "./errorhandler.js";
 import { ErrorType } from "#root/config/errors.js";
@@ -27,7 +27,7 @@ export interface ApiBuilderOptions<T> {
   mongoClientOptions: MongoClientOptions;
   dbName: string;
   collection: string;
-  schema: ZodObject<any>;
+  schema: ZodObject<Record<string, ZodType>>;
   port?: number;
   uniqueFields?: (keyof T)[];
 }
@@ -238,8 +238,9 @@ export class ApiBuilder<TEntity> {
     this.logger.debug("Registering shutdown handlers");
 
     /**
-     *
-     * @param signal
+     * Handles graceful shutdown on process termination signals.
+     * @param {string} signal - The termination signal received (SIGINT, SIGTERM, etc.)
+     * @returns {Promise<void>} Resolves when shutdown is complete
      */
     const shutdown = async (signal: string): Promise<void> => {
       this.logger.info(`Received ${signal}, shutting down gracefully`);

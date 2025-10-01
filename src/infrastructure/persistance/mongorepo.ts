@@ -75,35 +75,6 @@ export class MongoDbRepository<TEntity extends Document>
   }
 
   /**
-   * Creates necessary indexes for the collection.
-   * @private
-   */
-  private async createIndexes(): Promise<void> {
-    // Only create explicit unique indexes for configured fields.
-
-    if (!this.uniqueFields) {
-      return;
-    }
-    const indexes: IndexDescription[] = this.uniqueFields.map((config) => ({
-      key: { [config]: 1 },
-      unique: true,
-      name: `idx_unique_${String(config)}`,
-    }));
-
-    if (indexes.length > 0) {
-      try {
-        await this.collection.createIndexes(indexes);
-      } catch (error) {
-        // Indexes may already exist (ok for idempotent init)
-        // eslint-disable-next-line no-console
-        console.warn(
-          `Warning creating indexes for ${this.collectionName}:`,
-          error,
-        );
-      }
-    }
-  }
-  /**
    * Creates a new entity with comprehensive error handling.
    * Throws structured errors that are handled by the global error handler.
    *
@@ -346,78 +317,6 @@ export class MongoDbRepository<TEntity extends Document>
   }
 
   /**
-   * Validates unique field constraints before database operations.
-   *
-   * @param {Partial<TEntity>} data - Data to validate
-   * @param {ObjectId} [excludeId] - ID to exclude from uniqueness check (for updates)
-   * @returns {Promise<boolean>} True if valid, false if constraint violation
-   * @private
-   */
-  private async validateUniqueConstraints(
-    data: Partial<TEntity>,
-    excludeId?: ObjectId,
-  ): Promise<boolean> {
-    if (!this.uniqueFields) {
-      return true;
-    }
-
-    try {
-      for (const fieldName of this.uniqueFields) {
-        const fieldValue = data[fieldName];
-        if (fieldValue === undefined) {
-          continue;
-        }
-
-        const query: any = { [fieldName]: fieldValue };
-        if (excludeId) {
-          query._id = { $ne: excludeId };
-        }
-
-        const existing = await this.collection.findOne(query);
-        if (existing) {
-          this.logger.warn("Unique constraint violation detected", {
-            field: fieldName,
-            value: fieldValue,
-            existingId: existing._id,
-            excludeId,
-          });
-          return false;
-        }
-      }
-      return true;
-    } catch (error) {
-      this.logger.error("Error validating unique constraints", {
-        error: error instanceof Error ? error.message : "Unknown error",
-        data,
-        uniqueFields: this.uniqueFields,
-      });
-      throw new ApplicationError({
-        type: ErrorType.DATABASE_ERROR,
-        message: "Failed to validate unique constraints",
-        statusCode: 500,
-        metadata: {
-          operation: "validateUniqueConstraints",
-          data,
-          uniqueFields: this.uniqueFields,
-        },
-        cause: error instanceof Error ? error : new Error(String(error)),
-      });
-    }
-  }
-
-  /**
-   * Extracts the field name from MongoDB duplicate key error message.
-   *
-   * @param {string} errorMessage - MongoDB error message
-   * @returns {string} Field name that caused the duplicate error
-   * @private
-   */
-  private extractDuplicateField(errorMessage: string): string {
-    const match = errorMessage.match(/index:\s+([^\s]+)/);
-    return match?.[1] ?? "unknown_field";
-  }
-
-  /**
    * Permanently removes an entity from the persistence layer by its ID.
    *
    * @param {string} id - The unique identifier of the entity to remove.
@@ -582,5 +481,107 @@ export class MongoDbRepository<TEntity extends Document>
         cause: error as Error,
       });
     }
+  }
+
+  /**
+   * Creates necessary indexes for the collection.
+   * @private
+   */
+  private async createIndexes(): Promise<void> {
+    // Only create explicit unique indexes for configured fields.
+
+    if (!this.uniqueFields) {
+      return;
+    }
+    const indexes: IndexDescription[] = this.uniqueFields.map((config) => ({
+      key: { [config]: 1 },
+      unique: true,
+      name: `idx_unique_${String(config)}`,
+    }));
+
+    if (indexes.length > 0) {
+      try {
+        await this.collection.createIndexes(indexes);
+      } catch (error) {
+        // Indexes may already exist (ok for idempotent init)
+        // eslint-disable-next-line no-console
+        console.warn(
+          `Warning creating indexes for ${this.collectionName}:`,
+          error,
+        );
+      }
+    }
+  }
+
+  /**
+   * Validates unique field constraints before database operations.
+   *
+   * @param {Partial<TEntity>} data - Data to validate
+   * @param {ObjectId} [excludeId] - ID to exclude from uniqueness check (for updates)
+   * @returns {Promise<boolean>} True if valid, false if constraint violation
+   * @private
+   */
+  private async validateUniqueConstraints(
+    data: Partial<TEntity>,
+    excludeId?: ObjectId,
+  ): Promise<boolean> {
+    if (!this.uniqueFields) {
+      return true;
+    }
+
+    try {
+      for (const fieldName of this.uniqueFields) {
+        const fieldValue = data[fieldName];
+        if (fieldValue === undefined) {
+          continue;
+        }
+
+        const query: any = { [fieldName]: fieldValue };
+        if (excludeId) {
+          query._id = { $ne: excludeId };
+        }
+
+        const existing = await this.collection.findOne(query);
+        if (existing) {
+          this.logger.warn("Unique constraint violation detected", {
+            field: fieldName,
+            value: fieldValue,
+            existingId: existing._id,
+            excludeId,
+          });
+          return false;
+        }
+      }
+      return true;
+    } catch (error) {
+      this.logger.error("Error validating unique constraints", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        data,
+        uniqueFields: this.uniqueFields,
+      });
+      throw new ApplicationError({
+        type: ErrorType.DATABASE_ERROR,
+        message: "Failed to validate unique constraints",
+        statusCode: 500,
+        metadata: {
+          operation: "validateUniqueConstraints",
+          data,
+          uniqueFields: this.uniqueFields,
+        },
+        cause: error instanceof Error ? error : new Error(String(error)),
+      });
+    }
+  }
+
+  /**
+   * Extracts the field name from MongoDB duplicate key error message.
+   *
+   * @param {string} errorMessage - MongoDB error message
+   * @returns {string} Field name that caused the duplicate error
+   * @private
+   */
+  private extractDuplicateField(errorMessage: string): string {
+    const match = errorMessage.match(/index:\s+([^\s]+)/);
+    return match?.[1] ?? "unknown_field";
   }
 }

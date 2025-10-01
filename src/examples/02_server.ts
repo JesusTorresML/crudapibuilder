@@ -1,4 +1,4 @@
-import express from "express";
+import type { z } from "zod";
 import { buildSchema } from "../infrastructure/tools/schemabuilder/index.js";
 import { ApiBuilder } from "../infrastructure/http/apibuilder.js";
 import { localConfig } from "#root/config/local.js";
@@ -7,11 +7,13 @@ const ProductSchema = buildSchema({
   name: { type: "string", min: 1 },
   price: { type: "number", min: 0 },
 });
-type Product = { name: string; price: number };
 
-const app = express();
+// type Product = { name: string; price: number };
+export type InferSchema<T> = T extends z.ZodTypeAny ? z.infer<T> : never;
 
-(async () => {
+export type Product = InferSchema<typeof ProductSchema>;
+
+(async (): Promise<void> => {
   const builder = new ApiBuilder<Product>(
     {
       mongoClientOptions: {
@@ -21,15 +23,11 @@ const app = express();
       dbName: "mydb",
       collection: "products",
       schema: ProductSchema,
+      port: 5000,
       uniqueFields: ["name"],
     },
     localConfig,
   );
 
-  const productRouter = await builder.buildRouter();
-  app.use("/products", productRouter);
-
-  app.listen(4000, () =>
-    console.log("Custom server running at http://localhost:4000"),
-  );
+  await builder.buildServer(); // runs immediately
 })();

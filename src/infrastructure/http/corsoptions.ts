@@ -3,7 +3,7 @@ import type { CorsOptions } from "cors";
 
 /**
  * Configure corsOptions from allowed Origins.
- * @param allowedOrigins
+ * @param {string[]} allowedOrigins - Array of allowed origin URLs
  * @returns {CorsOptions} - CorsOptions.
  */
 export function checkCorsOptions(allowedOrigins: string[]): CorsOptions {

@@ -2,9 +2,9 @@
  * Integration test for MongoDbRepository<User>
  *
  * This test script demonstrates basic CRUD operations
- * and unique constraint handling.
+ * and unique constraint handling with proper logging.
  *
- * Run:  ts-node src/tests/01_mongorepo.ts
+ * Run:  npx ts-node src/examples/01_mongorepo.ts
  */
 
 import { MongoClient } from "mongodb";
@@ -22,89 +22,161 @@ export interface User {
 }
 
 /**
- *
+ * Main test execution function
+ * @returns {Promise<void>}
  */
 async function run(): Promise<void> {
+  const logger = new WinstonLogger();
   const client = new MongoClient("mongodb://localhost:27017");
 
   try {
     // 1. Connect to MongoDB
     await client.connect();
-    console.log("✅ Connected to MongoDB");
+    logger.info("Connected to MongoDB successfully");
 
-    const logger: WinstonLogger = new WinstonLogger();
-
-    // 2. Initialize repository
+    // 2. Initialize repository with unique fields
     const userRepo = new MongoDbRepository<User>(
       client,
-      "test_mongorepo", // database
-      "users", // collection
+      "testdb_mongorepo",
+      "users",
       ["email", "username"],
       logger,
     );
 
-    // 3. Ensure collection + indexes
-    await userRepo.initCollections();
-    console.log("✅ Collections initialized");
+    // 3. Ensure collection and indexes exist
+    const isNewCollection = await userRepo.initCollections();
+    logger.info(`Collection initialized (new: ${isNewCollection})`);
 
-    // 4. Create a new user
+    // 4. Test: Create a new user
+    logger.info("TEST 1: Creating new user");
     const u1 = await userRepo.create({
       username: "jdoe",
       email: "jdoe@mail.com",
       password: "1234",
     });
-    console.log("Created:", u1);
-
-    // 5. Try to create a duplicate user (should return null)
-    const u2 = await userRepo.create({
-      username: "other",
-      email: "jdoe@mail.com",
-      password: "abcd",
-    });
-    console.log("Duplicate create (expected null):", u2);
-
-    try {
-      // 6. Update user (try invalid and valid IDs)
-      const updatedInvalid = await userRepo.update(
-        "INVALID_ID", // invalid ObjectId string
-        { username: "johnny" },
-      );
-      console.log("Update with invalid id (expected null):", updatedInvalid);
-    } catch {}
 
     if (u1) {
+      logger.info("User created successfully", {
+        id: u1._id.toString(),
+        username: u1.username,
+        email: u1.email,
+      });
+    } else {
+      logger.warn("User creation returned null");
+    }
+
+    // 5. Test: Try to create a duplicate user (should return null)
+    logger.info("TEST 2: Attempting to create duplicate user");
+    const u2 = await userRepo.create({
+      username: "other",
+      email: "jdoe@mail.com", // duplicate email
+      password: "abcd",
+    });
+
+    if (u2 === null) {
+      logger.info("Duplicate detection working correctly (returned null)");
+    } else {
+      logger.error("Duplicate detection failed - should have returned null");
+    }
+
+    // 6. Test: Update with invalid ID
+    logger.info("TEST 3: Attempting update with invalid ID");
+    try {
+      const updatedInvalid = await userRepo.update("INVALID_ID", {
+        username: "johnny",
+      });
+      logger.warn("Update with invalid ID returned:", {
+        result: updatedInvalid,
+      });
+    } catch (error) {
+      logger.info("Invalid ID correctly rejected", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    // 7. Test: Update with valid ID
+    if (u1) {
+      logger.info("TEST 4: Finding and updating user");
       const userFind: MongoDocument<User> | null = await userRepo.findOne({
         email: "jdoe@mail.com",
       });
 
       if (userFind !== null) {
+        logger.info("User found for update", { id: userFind._id.toString() });
+
         const updatedValid = await userRepo.update(userFind._id, {
           password: "newpass",
         });
-        console.log("Update with valid id:", updatedValid);
+
+        if (updatedValid) {
+          logger.info("User updated successfully", {
+            id: updatedValid._id.toString(),
+            hasNewPassword: updatedValid.password === "newpass",
+          });
+        }
       }
     }
 
-    // 7. Query by unique field
-    const found = await userRepo.find({ email: "jdoe@mail.com" });
-    console.log("Found by email:", found);
+    // 8. Test: Query by unique field with pagination
+    logger.info("TEST 5: Finding users by email");
+    const found = await userRepo.find(
+      { email: "jdoe@mail.com" },
+      { skip: 0, limit: 10 },
+    );
+    logger.info("Find operation completed", {
+      foundCount: found.data.length,
+      total: found.total,
+    });
 
-    // 8. Delete user
+    // 9. Test: Count users
+    logger.info("TEST 6: Counting users");
+    const count = await userRepo.count({ email: "jdoe@mail.com" });
+    logger.info(`Total users with email 'jdoe@mail.com': ${count}`);
+
+    // 10. Test: Delete user
     if (u1) {
-      // ⚠️ The repository returns plain domain entity without _id.
-      // For demo, we re-fetch the user to get the id.
+      logger.info("TEST 7: Deleting user");
       const existing = await userRepo.findOne({ email: "jdoe@mail.com" });
+
       if (existing?._id) {
-        await userRepo.remove(existing._id.toString());
-        console.log("✅ User removed");
+        const deleted = await userRepo.remove(existing._id.toString());
+
+        if (deleted) {
+          logger.info("User removed successfully", {
+            id: existing._id.toString(),
+          });
+        } else {
+          logger.warn("User removal returned false");
+        }
       }
     }
+
+    // 11. Test: Verify deletion
+    logger.info("TEST 8: Verifying user deletion");
+    const verifyDeleted = await userRepo.findOne({ email: "jdoe@mail.com" });
+
+    if (verifyDeleted === null) {
+      logger.info("Deletion verified - user no longer exists");
+    } else {
+      logger.error("Deletion failed - user still exists");
+    }
+
+    logger.info("All tests completed successfully");
   } catch (err) {
-    console.error("❌ Test failed:", err);
+    logger.error("Test execution failed", {
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+    throw err;
   } finally {
     await client.close();
-    console.log("🔒 Connection closed");
+    logger.info("MongoDB connection closed");
   }
 }
 
-run();
+// Execute tests
+run().catch((error) => {
+  // eslint-disable-next-line no-console
+  console.error("Fatal error:", error);
+  process.exit(1);
+});

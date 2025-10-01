@@ -3,9 +3,10 @@ import type { SchemaDef } from "./types.js";
 
 /**
  * Wraps a Zod schema with `.optional()` and/or `.default()`.
- * @param schema
- * @param required
- * @param def
+ * @param {z.ZodTypeAny} schema - The Zod schema to wrap
+ * @param {boolean | undefined} required - Whether the field is required
+ * @param {unknown | undefined} def - Default value for the field
+ * @returns {z.ZodTypeAny} The wrapped schema
  */
 function withOptionalAndDefault<T extends z.ZodTypeAny>(
   schema: T,
@@ -25,8 +26,8 @@ function withOptionalAndDefault<T extends z.ZodTypeAny>(
 /**
  * Builds a Zod object schema from a declarative schema definition.
  *
- * @param def - The declarative schema definition
- * @returns A ZodObject schema
+ * @param {TDef} def - The declarative schema definition
+ * @returns {z.ZodObject<Record<string, z.ZodTypeAny>>} A ZodObject schema
  */
 export function buildSchema<TDef extends SchemaDef>(
   def: TDef,
@@ -101,5 +102,5 @@ export function buildSchema<TDef extends SchemaDef>(
     shape[key] = schema;
   }
 
-  return z.object(shape) as z.ZodObject<any>;
+  return z.object(shape) as z.ZodObject<Record<string, z.ZodTypeAny>>;
 }

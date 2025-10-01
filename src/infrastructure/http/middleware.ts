@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import type { ZodObject } from "zod";
+import type { ZodObject, ZodType } from "zod";
 import { ZodError } from "zod";
 import type { RequestHandler } from "express";
 import { ValidationError } from "#root/config/errors.js";
@@ -14,7 +14,7 @@ import { ValidationError } from "#root/config/errors.js";
  * @returns {RequestHandler} Express middleware function
  */
 export function validationMiddleware<TEntity>(
-  schema: ZodObject<any>,
+  schema: ZodObject<Record<string, ZodType>>,
   options: ValidationOptions = {},
 ): RequestHandler {
   const {
@@ -106,16 +106,15 @@ function determineOperation(req: Request): string {
  * @template TEntity - Entity type being created
  * @param {Request} req - Express request object
  * @param {Response} res - Express response object
- * @param {ZodSchema} schema - Validation schema
- * @param options - Options object.
- * @param options.allowUnknownFields - Strict mode -> AllowUnknown fields
- * @param options.strictMode -
+ * @param {ZodObject<Record<string, z.ZodTypeAny>>} schema - Validation schema
  * @param {Object} options - Validation options
+ * @param {boolean} options.allowUnknownFields - Whether to allow fields not in schema (strict mode)
+ * @param {boolean} options.strictMode - Whether to use strict validation mode
  */
 function handleCreateValidation<TEntity>(
   req: Request,
   res: Response,
-  schema: ZodObject<any>,
+  schema: ZodObject<Record<string, ZodType>>,
   options: { allowUnknownFields: boolean; strictMode: boolean },
 ): void {
   if (!req.body || Object.keys(req.body).length === 0) {
@@ -142,14 +141,14 @@ function handleCreateValidation<TEntity>(
  * @template TEntity - Entity type being updated
  * @param {Request} req - Express request object
  * @param {Response} res - Express response object
- * @param {ZodSchema} schema - Validation schema
- * @param options.allowUnknownFields
+ * @param {ZodObject<Record<string, z.ZodTypeAny>>} schema - Validation schema
  * @param {Object} options - Validation options
+ * @param {boolean} options.allowUnknownFields - Whether to allow fields not in schema
  */
 function handleUpdateValidation<TEntity>(
   req: Request,
   res: Response,
-  schema: ZodObject<any>,
+  schema: ZodObject<Record<string, ZodType>>,
   options: { allowUnknownFields: boolean },
 ): void {
   if (!req.body || Object.keys(req.body).length === 0) {
@@ -176,14 +175,14 @@ function handleUpdateValidation<TEntity>(
  * @template TEntity - Entity type being searched
  * @param {Request} req - Express request object
  * @param {Response} res - Express response object
- * @param {ZodSchema} schema - Validation schema
- * @param options.coerceTypes
+ * @param {ZodObject<Record<string, z.ZodTypeAny>>} schema - Validation schema
  * @param {Object} options - Validation options
+ * @param {boolean} options.coerceTypes - Whether to attempt type coercion for query parameters
  */
 function handleFindValidation<TEntity>(
   req: Request,
   res: Response,
-  schema: ZodObject<any>,
+  schema: ZodObject<Record<string, ZodType>>,
   options: { coerceTypes: boolean },
 ): void {
   const queryParams = req.query as Record<string, unknown>;
