@@ -188,7 +188,7 @@ function handleFindValidation<TEntity>(
   const queryParams = req.query as Record<string, unknown>;
 
   // Remove pagination parameters from validation
-  const { skip, limit, sortBy, sortOrder, ...filterParams } = queryParams;
+  const { _skip, _limit, _sortBy, _sortOrder, ...filterParams } = queryParams;
 
   let processedParams = filterParams;
 

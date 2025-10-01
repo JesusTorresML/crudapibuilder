@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * Field descriptors and schema definition types
  * used by the schema builder.

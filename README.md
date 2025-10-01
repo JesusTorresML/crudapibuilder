@@ -52,6 +52,7 @@ A lightweight TypeScript micro-framework that generates **productive CRUD APIs**
 ```
 
 **Key Components:**
+
 - **Repository (MongoDbRepository)**: Direct MongoDB CRUD + unique indexes
 - **Service (CrudService)**: Orchestrates repository, exposes domain API
 - **Controller (CrudController)**: Express handlers calling the service
@@ -211,6 +212,7 @@ uniqueFields: ["name", "email"];
 - Logs include structured metadata for better debugging
 
 Example log output:
+
 ```
 [2025-09-30 19:34:03] [INFO]: Repository: Entity created successfully {"entityId":"507f1f77bcf86cd799439011","collectionName":"products"}
 ```
@@ -355,6 +357,7 @@ This project is licensed under a **Dual License**:
 - **Commercial Use**: Requires a written commercial license from the copyright holder.
 
 ### Non-Commercial Use Includes:
+
 - Personal projects without revenue generation
 - Educational/academic purposes
 - Evaluation and testing
@@ -362,6 +365,7 @@ This project is licensed under a **Dual License**:
 - Registered non-profit organizations
 
 ### Commercial Use Includes:
+
 - Integration into products/services that are sold
 - Use in for-profit company operations
 - Paid consulting/support services
@@ -375,6 +379,7 @@ See the [LICENSE](LICENSE) file for full details.
 ## 👤 Author
 
 **JESUS ALBERTO TORRES VELASQUEZ**
+
 - Email: jesust07@gmail.com
 - Codeberg: [@jesustorresml07](https://codeberg.org/jesustorresml07)
 
@@ -383,12 +388,14 @@ See the [LICENSE](LICENSE) file for full details.
 ## 🤝 Contributing
 
 Contributions are welcome! Please ensure:
+
 - All tests pass
 - Code follows ESLint rules
 - JSDoc comments are complete
 - New features include tests
 
 ### How to contribute:
+
 1. Fork the repository on Codeberg
 2. Create a feature branch
 3. Make your changes
@@ -399,6 +406,7 @@ Contributions are welcome! Please ensure:
 ## 📞 Support
 
 For issues, questions, or commercial licensing:
+
 - Email: jesust07@gmail.com
 - Issues: [Codeberg Issues](https://codeberg.org/jesustorresml07/CrudApiBuilder/issues)
 

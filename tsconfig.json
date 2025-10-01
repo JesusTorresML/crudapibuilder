@@ -3,23 +3,24 @@
     // Output configuration
     "outDir": "./dist",
     "rootDir": "./src",
-    "declaration": true,              // Generate .d.ts files
-    "declarationMap": true,           // Generate sourcemaps for .d.ts files
-    "sourceMap": true,                // Generate .js.map files
-    
+    "declaration": true, // Generate .d.ts files
+    "declarationMap": true, // Generate sourcemaps for .d.ts files
+    "sourceMap": true, // Generate .js.map files
+
     // Module resolution
     "module": "ESNext",
     "moduleResolution": "node",
     "target": "ES2022",
     "lib": ["ES2022"],
-    
+
     // Type checking
     "strict": true,
+    "noImplicitAny": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    
+
     // Path mapping (for development, removed in production)
     "baseUrl": ".",
     "paths": {
@@ -33,7 +34,7 @@
   "include": ["src/**/*"],
   "exclude": [
     "node_modules",
-    "dist",
+    "dist/*",
     // "src/examples/**/*",           // Don't include examples in build
     "**/*.test.ts",
     "**/*.spec.ts"

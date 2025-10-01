@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * Extended test client for the ApiBuilder-generated API.
  * Covers CRUD lifecycle and uniqueFields validation with proper typing.

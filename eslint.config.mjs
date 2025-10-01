@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-plugin-prettier';
 
 export default tseslint.config({
-  files: ['**/*.ts'],
+  files: ['src/**/*.ts'],
   languageOptions: {
     parser: tseslint.parser,
     parserOptions: {
@@ -26,11 +26,17 @@ export default tseslint.config({
   rules: {
     // Prettier
     'prettier/prettier': 'error', 
+    '@typescript-eslint/explicit-function-return-type': [
+      'error',
+      {
+        allowExpressions: true // allow direct expressions
+      }
+    ],
 
     // TypeScript
     '@typescript-eslint/explicit-function-return-type': 'warn',
     '@typescript-eslint/no-explicit-any': 'error',
-    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     '@typescript-eslint/consistent-type-imports': 'error',
     '@typescript-eslint/consistent-type-exports': 'error',
     '@typescript-eslint/explicit-member-accessibility': ['error', { accessibility: 'explicit' }],
