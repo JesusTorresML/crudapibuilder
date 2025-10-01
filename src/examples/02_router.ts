@@ -1,9 +1,9 @@
 import express from "express";
 import { buildSchema } from "../infrastructure/tools/schemabuilder/index.js";
 import { ApiBuilder } from "../infrastructure/http/apibuilder.js";
-import { localConfig } from "#root/config/local.js";
 import type { Logger } from "#root/domain/logger.interface.js";
 import { WinstonLogger } from "#root/infrastructure/index.js";
+import { localConfig } from "#root/config/local.js";
 
 const ProductSchema = buildSchema({
   name: { type: "string", min: 1 },
@@ -17,10 +17,6 @@ const app = express();
   const logger: Logger = new WinstonLogger();
   const builder = new ApiBuilder<Product>(
     {
-      mongoClientOptions: {
-        serverHost: localConfig.database.serverHost,
-        serverPort: localConfig.database.serverPort,
-      },
       dbName: "mydb",
       collection: "products",
       schema: ProductSchema,

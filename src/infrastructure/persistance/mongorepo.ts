@@ -504,7 +504,7 @@ export class MongoDbRepository<TEntity extends Document>
         await this.collection.createIndexes(indexes);
       } catch (error) {
         // Indexes may already exist (ok for idempotent init)
-        // eslint-disable-next-line no-console
+
         console.warn(
           `Warning creating indexes for ${this.collectionName}:`,
           error,

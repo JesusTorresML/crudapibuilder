@@ -72,10 +72,18 @@ A lightweight TypeScript micro-framework that generates **productive CRUD APIs**
 
 ## 🚀 Quick Start (Standalone Server)
 
+1. Add the a dependency in your package.json in your project.
+```
+  "dependencies": {
+    "crud-api-builder": "git+https://codeberg.org/jesustorresml07/CrudApiBuilder.git#main"
+  }
+```
+2. Create a index.ts file with follow example:
+
 ```typescript
-import { buildSchema } from "./src/infrastructure/tools/schemabuilder";
-import { ApiBuilder } from "./src/infrastructure/http/apibuilder";
-import { localConfig } from "./src/config/local";
+import { buildSchema } from "crud-api-builder";
+import { ApiBuilder } from "crud-api-builder";
+
 
 const ProductSchema = buildSchema({
   name: { type: "string", min: 1 },
@@ -85,22 +93,18 @@ const ProductSchema = buildSchema({
 type Product = { name: string; price: number };
 
 (async (): Promise<void> => {
-  const builder = new ApiBuilder<Product>(
-    {
-      mongoClientOptions: {
-        serverHost: localConfig.database.serverHost,
-        serverPort: localConfig.database.serverPort,
-      },
-      dbName: "mydb",
-      collection: "products",
-      schema: ProductSchema,
-      port: 5000,
-      uniqueFields: ["name"],
+  const builder = new ApiBuilder<Product>({
+    dbName: "mydb",
+    collection: "products",
+    schema: ProductSchema,
+    port: 5000,
+    mongoConnection: {
+      serverHost: "localhost",
+      serverPort: "27017",
     },
-    localConfig,
-  );
+  });
 
-  await builder.buildServer();
+  await builder.buildServer(); // runs immediately
 })();
 ```
 

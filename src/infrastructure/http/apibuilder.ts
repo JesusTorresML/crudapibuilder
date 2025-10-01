@@ -12,7 +12,6 @@ import { ErrorType } from "#root/config/errors.js";
 import { MongoDbRepository } from "../persistance/mongorepo.js";
 import { CrudService } from "#root/application/services/crud.js";
 import { CrudController } from "./controller.js";
-import type { MongoClientOptions } from "../persistance/types.js";
 import { MongoConnection } from "../persistance/mongoconnection.js";
 import { WinstonLogger } from "../logger/winston.logger.js";
 import type { AppConfig } from "#root/config/types.js";
@@ -24,12 +23,20 @@ import { createCrudRouter } from "./router.js";
  * Options for creating an API Builder instance.
  */
 export interface ApiBuilderOptions<T> {
-  mongoClientOptions: MongoClientOptions;
   dbName: string;
   collection: string;
   schema: ZodObject<Record<string, ZodType>>;
   port?: number;
   uniqueFields?: (keyof T)[];
+  mongoConnection?: {
+    serverHost: string;
+    serverPort: string;
+  };
+  apiConfig?: {
+    allowedOrigins?: string[];
+    rateLimitWindowMs?: number;
+    rateLimitMaxRequests?: number;
+  };
 }
 
 /**
@@ -50,9 +57,15 @@ export class ApiBuilder<TEntity> {
    * @param {ApiBuilderOptions<TEntity>} options - Configuration options for the API builder
    * @param {AppConfig} [config] - Application configuration object
    */
-  public constructor(options: ApiBuilderOptions<TEntity>, config: AppConfig) {
+  public constructor(options: ApiBuilderOptions<TEntity>, config?: AppConfig) {
     this.options = options;
-    this.config = config;
+    // Priority: provided config > options inline > default config file
+    if (config) {
+      this.config = config;
+    } else {
+      // Use inline options or fallback to local.json
+      this.config = this.buildConfigFromOptions(options);
+    }
     this.logger = new WinstonLogger();
 
     this.mongoConnection = new MongoConnection(
@@ -250,5 +263,32 @@ export class ApiBuilder<TEntity> {
 
     process.on("SIGINT", () => shutdown("SIGINT"));
     process.on("SIGTERM", () => shutdown("SIGTERM"));
+  }
+
+  /**
+   * Build configuration object
+   * @param {ApiBuilderOptions<TEntity>} options - Configuration options
+   */
+  private buildConfigFromOptions(
+    options: ApiBuilderOptions<TEntity>,
+  ): AppConfig {
+    // Build config from inline options with defaults
+    return {
+      database: {
+        serverHost: options.mongoConnection?.serverHost || "localhost",
+        serverPort: options.mongoConnection?.serverPort || "27017",
+        compressionLevel: 6,
+        compresors: ["snappy"],
+      },
+      apiServerConfig: {
+        hostname: "localhost",
+        port: String(options.port || 3000),
+        allowedOrigins: options.apiConfig?.allowedOrigins || [
+          "http://localhost:3000",
+        ],
+        rateLimitWindowMs: options.apiConfig?.rateLimitWindowMs || 900000,
+        rateLimitMaxRequests: options.apiConfig?.rateLimitMaxRequests || 100,
+      },
+    };
   }
 }
