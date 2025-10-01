@@ -46,6 +46,7 @@
   ],
   "scripts": {
     "build": "tsc --build",
+    "prepare": "npm run build",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "prebuild": "npm run clean",
     "prepublishOnly": "npm run build",
