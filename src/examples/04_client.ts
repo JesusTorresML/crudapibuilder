@@ -390,7 +390,7 @@ class ApiTestClient {
         },
       });
 
-      const data = await response.json();
+      const data: any = await response.json();
 
       this.logger.debug("Response received", {
         status: response.status,

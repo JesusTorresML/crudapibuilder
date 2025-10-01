@@ -1,0 +1,42 @@
+# Source files (only ship compiled code)
+src/
+tsconfig.json
+eslint.config.mjs
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Tests and examples
+src/examples/
+test.js
+**/*.test.ts
+**/*.spec.ts
+
+# Development configs
+.eslintrc*
+.prettierrc*
+.editorconfig
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Logs
+logs/
+*.log
+
+# Build artifacts
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Documentation source
+docs/
+
+# Git
+.git/
+.gitignore
+.gitattributes

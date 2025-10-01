@@ -69,11 +69,6 @@ A lightweight TypeScript micro-framework that generates **productive CRUD APIs**
 
 ---
 
-## Introduction
-
-- Install dependences ```npm install```
-- Compile ```npm run build```
-
 ## 🚀 Quick Start (Standalone Server)
 
 ```typescript
@@ -153,20 +148,17 @@ curl -X DELETE http://localhost:5000/products/<id>
 The project includes comprehensive test files:
 
 ```bash
-# Compile:
-npm run build
-
 # Test MongoDB repository directly
-node dist dist/examples/01_mongorepo.ts
+npx ts-node src/examples/01_mongorepo.ts
 
 # Test router (mount in custom app)
-node dist dist/examples/02_router.ts
+npx ts-node src/examples/02_test_router.ts
 
 # Test standalone server
-node dist dist/examples/02_server.ts
+npx ts-node src/examples/02_test_server.ts
 
 # Test complete API client (server must be running)
-node dist dist/examples/04_client.ts
+npx ts-node src/examples/04_test_client.ts
 ```
 
 ---
@@ -329,7 +321,7 @@ export enum ErrorType {
 4. Configure `config/local.json`
 5. Run examples:
    ```bash
-   mode dist/examples/02_server.ts
+   npx ts-node src/examples/02_test_server.ts
    ```
 
 ### Linting
@@ -383,6 +375,8 @@ See the [LICENSE](LICENSE) file for full details.
 ## 👤 Author
 
 **JESUS ALBERTO TORRES VELASQUEZ**
+- Email: jesust07@gmail.com
+- Codeberg: [@jesustorresml07](https://codeberg.org/jesustorresml07)
 
 ---
 
@@ -394,13 +388,26 @@ Contributions are welcome! Please ensure:
 - JSDoc comments are complete
 - New features include tests
 
+### How to contribute:
+1. Fork the repository on Codeberg
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
 ---
 
 ## 📞 Support
 
 For issues, questions, or commercial licensing:
 - Email: jesust07@gmail.com
-- Create an issue on GitHub
+- Issues: [Codeberg Issues](https://codeberg.org/jesustorresml07/CrudApiBuilder/issues)
+
+---
+
+## 🔗 Links
+
+- Repository: [https://codeberg.org/jesustorresml07/CrudApiBuilder](https://codeberg.org/jesustorresml07/CrudApiBuilder)
+- npm package: `crud-api-builder`
 
 ---
 

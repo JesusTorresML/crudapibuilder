@@ -1,33 +1,41 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
+    // Output configuration
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,              // Generate .d.ts files
+    "declarationMap": true,           // Generate sourcemaps for .d.ts files
+    "sourceMap": true,                // Generate .js.map files
+    
+    // Module resolution
     "module": "ESNext",
-    "moduleResolution": "Node",
-    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    
+    // Type checking
     "strict": true,
-    "declaration": true,
-    "composite": true, // Important.
-    "sourceMap": true,
-    "outDir": "dist",
-    "rootDir": "src",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    
+    // Path mapping (for development, removed in production)
     "baseUrl": ".",
     "paths": {
-      "#root/*": ["src/*"],
+      "#root/*": ["./src/*"],
       "#domain/*": ["src/domain/*"],
       "#application/*": ["src/application/*"],
       "#infrastructure/*": ["src/domain/*"],
       "#config/*": ["src/config/*"]
-    },
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
-    "noPropertyAccessFromIndexSignature": true,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "skipLibCheck": true
+    }
   },
-  "include": ["src/**/*", "tests/index.test.ts", "test.js"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    // "src/examples/**/*",           // Don't include examples in build
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
 }
