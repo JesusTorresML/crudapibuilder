@@ -11,7 +11,7 @@
  * Run:  npx ts-node src/examples/04_test_client.ts
  */
 
-import { WinstonLogger } from "../infrastructure/logger/winston.logger.js";
+import { WinstonLogger } from "../../infrastructure/logger/winston.logger.js";
 
 const BASE_URL = "http://localhost:5000/products";
 

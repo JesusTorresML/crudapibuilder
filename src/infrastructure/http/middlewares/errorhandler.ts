@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { WinstonLogger } from "../logger/index.js";
+import { WinstonLogger } from "../../logger/index.js";
 import { ErrorType, ValidationError } from "#root/config/errors.js";
 import { ApplicationError } from "#root/config/errors.js";
 import { MongoServerError } from "mongodb";

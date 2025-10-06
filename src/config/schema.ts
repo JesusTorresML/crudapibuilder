@@ -7,7 +7,7 @@ import type { AppConfig } from "./types";
  * as a separate, configurable object to allow for individual environment variable mapping.
  */
 export const configSchema: Schema<AppConfig> = {
-  apiServerConfig: {
+  server: {
     hostname: {
       doc: "APIserver ip",
       format: String,
@@ -15,21 +15,21 @@ export const configSchema: Schema<AppConfig> = {
     },
     port: {
       doc: "API Port",
-      format: String,
-      default: "1234",
+      format: Number,
+      default: 1234,
     },
-    allowedOrigins: ["http://localhost", "http://localhost:1234"],
+    allowedOrigins: ["http://localhost", "http://localhost:5000"],
     rateLimitWindowMs: 300,
     rateLimitMaxRequests: 100,
   },
 
-  database: {
-    serverHost: {
+  mongo: {
+    host: {
       doc: "Mongodb ServerHost",
       format: String,
       default: "localhost",
     },
-    serverPort: {
+    port: {
       doc: "Mongodb ServerPort",
       format: String,
       default: "27017",
@@ -40,5 +40,10 @@ export const configSchema: Schema<AppConfig> = {
       default: 6,
     },
     compresors: ["zlib", "snappy", "zstd"],
+  },
+
+  database: {
+    name: "default_database",
+    collection: " default_collection",
   },
 };

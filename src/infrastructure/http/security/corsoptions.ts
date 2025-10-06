@@ -1,4 +1,4 @@
-import { CustomError } from "../tools/errors.js";
+import { CorsError } from "#root/config/errors.js";
 import type { CorsOptions } from "cors";
 
 /**
@@ -21,7 +21,7 @@ export function checkCorsOptions(allowedOrigins: string[]): CorsOptions {
         callback(null, true);
       } else if (!allowedOrigins.includes(origin)) {
         callback(
-          new CustomError({
+          new CorsError({
             name: "CONFIG_ERROR",
             message: "Forbidden: invalid Origin",
             cause: `Origin '${origin}' not in allowed origins: ${allowedOrigins.join(", ")}`,

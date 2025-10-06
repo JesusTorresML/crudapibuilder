@@ -27,14 +27,14 @@
       "#root/*": ["./src/*"],
       "#domain/*": ["src/domain/*"],
       "#application/*": ["src/application/*"],
-      "#infrastructure/*": ["src/domain/*"],
+      "#infrastructure/*": ["src/infrastructure/*"],
       "#config/*": ["src/config/*"]
     }
   },
   "include": ["src/**/*"],
   "exclude": [
     "node_modules",
-    "dist/*",
+    "dist",
     // "src/examples/**/*",           // Don't include examples in build
     "**/*.test.ts",
     "**/*.spec.ts"

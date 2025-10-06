@@ -1,7 +1,8 @@
 import { Router } from "express";
-import type { CrudController } from "./controller";
+import type { CrudController } from "./controller.js";
 import type { ZodObject, ZodType } from "zod";
-import { validationMiddleware } from "./middleware.js";
+
+import { validationMiddleware } from "../middlewares/datavalidator.js";
 
 /**
  * Generic CRUD Router.

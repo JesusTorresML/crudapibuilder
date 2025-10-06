@@ -21,7 +21,7 @@ export class MongoConnection {
     private readonly logger: Logger,
   ) {
     this.mongoClientOptions = mongoClientOptions;
-    // Commented line shutdown, will be handle with MultiChain Orchestor.
+    // Commented line shutdown, will be handle with Main Orchestor.
     // this.registerForShutdown();
   }
 
@@ -35,10 +35,13 @@ export class MongoConnection {
     }
     try {
       // Usar la configuración para la URI de la base de datos
-      const uri = `mongodb://${this.mongoClientOptions.serverHost}:${this.mongoClientOptions.serverPort}`; // e.g., 'mongodb://localhost:27017'
+      const uri = `mongodb://${this.mongoClientOptions.host}:${this.mongoClientOptions.port}`; // e.g., 'mongodb://localhost:27017'
       this.client = new MongoClient(uri, {
-        zlibCompressionLevel: localConfig.database.compressionLevel,
-        compressors: localConfig.database.compresors,
+        zlibCompressionLevel:
+          this.mongoClientOptions.compressionLevel ??
+          localConfig.mongo.compressionLevel,
+        compressors:
+          this.mongoClientOptions.compresors ?? localConfig.mongo.compresors,
       });
       await this.client.connect();
       this.logger.debug("[MongoConnection] ✅ MongoDB connection established.");

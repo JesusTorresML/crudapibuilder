@@ -35,14 +35,17 @@ export class CrudService<TEntity> implements IService<TEntity> {
    * @throws {ValidationError} When entity data fails business validation
    * @throws {ApplicationError} When creation operation fails
    */
-  public async create(data: TEntity): Promise<MongoDocument<TEntity> | null> {
+  public async create(data: TEntity): Promise<MongoDocument<TEntity>> {
     this.logger.debug("Service: Creating new entity", { data });
 
     const result = await this.repository.create(data);
 
     if (!result) {
-      this.logger.error("Failed to create entity - operation returned null");
-      return null;
+      throw new ApplicationError({
+        type: ErrorType.DATABASE_ERROR,
+        message: "Failed to create entity",
+        statusCode: 500,
+      });
     }
 
     this.logger.info("Service: Entity created successfully", {

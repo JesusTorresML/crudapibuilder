@@ -3,6 +3,7 @@
  * and handling throughout the application.
  */
 export enum ErrorType {
+  CORS_ERROR = "CORS_ERROR",
   VALIDATION_ERROR = "VALIDATION_ERROR",
   NOT_FOUND_ERROR = "NOT_FOUND_ERROR",
   DUPLICATE_ERROR = "DUPLICATE_ERROR",
@@ -10,7 +11,10 @@ export enum ErrorType {
   CONFIG_ERROR = "CONFIG_ERROR",
   SERVER_ERROR = "SERVER_ERROR",
   AUTHORIZATION_ERROR = "AUTHORIZATION_ERROR",
+  ROUTE_NOT_FOUND = "ROUTE_NOT_FOUND",
 }
+
+export type ErrorName = "CONFIG_ERROR" | "TypeError" | "Error" | "SERVER_ERROR";
 
 /**
  * Base application error class that provides consistent error structure
@@ -100,5 +104,96 @@ export class ValidationError extends ApplicationError {
     });
     this.field = field;
     this.violations = violations;
+  }
+}
+
+/**
+ *
+ */
+export class CorsError extends ApplicationError {
+  public readonly name: string;
+  public readonly message: string;
+  public readonly cause: string;
+
+  /**
+   *
+   * @param {string} name - Error name
+   * @param {string} message - Error message
+   * @param {string} cause - Error cause.
+   */
+  public constructor({
+    name,
+    message,
+    cause,
+  }: {
+    name: string;
+    message: string;
+    cause: string;
+  }) {
+    super({
+      type: ErrorType.CORS_ERROR,
+      message,
+      statusCode: 400,
+      metadata: { name, message, cause },
+    });
+    this.name = name;
+    this.message = message;
+    this.cause = cause;
+  }
+}
+
+/**
+ *
+ */
+export class RouteError extends ApplicationError {
+  public readonly route?: string;
+
+  /**
+   * Creates a validation error with specific field and violation details.
+   *
+   * @param {Object} params - Validation error parameters
+   * @param {string} params.route - HTTP Route
+   * @param {string} [params.method] - HTTP Method.
+   * @param {string} params.message - Custom message
+   */
+  public constructor({
+    message,
+    route,
+    method,
+  }: {
+    message: string;
+    route?: string;
+    method?: string;
+  }) {
+    super({
+      type: ErrorType.ROUTE_NOT_FOUND,
+      message,
+      statusCode: 404,
+      metadata: { route, method },
+    });
+    this.route = route;
+  }
+}
+
+/**
+ *
+ */
+export class CustomError extends Error {
+  public override name: ErrorName;
+  public override message: string;
+  public override cause: any;
+
+  /**
+   * Constructs a new instance of `CustomError`.
+   * @param {object} params - An object containing the error properties.
+   * @param {ErrorName} params.name - The name of the predefined error.
+   * @param {string} params.message - A descriptive message for the error.
+   * @param {any} params.cause - The cause of the error, providing additional context.
+   */
+  public constructor(params: { name: ErrorName; message: string; cause: any }) {
+    super();
+    this.name = params.name;
+    this.message = params.message;
+    this.cause = params.cause;
   }
 }

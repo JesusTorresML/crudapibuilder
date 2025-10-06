@@ -1,3 +1,5 @@
+import { ObjectId, MongoServerError } from "mongodb";
+
 import type {
   Collection,
   Db,
@@ -8,13 +10,14 @@ import type {
   OptionalUnlessRequiredId,
   IndexDescription,
   CollectionInfo,
+  WithId,
 } from "mongodb";
-import { ObjectId, MongoServerError } from "mongodb";
-import type { IRepository } from "#root/domain/index.js";
+
 import { ValidationError, ApplicationError } from "#root/config/errors.js";
 import { ErrorType } from "#root/config/errors.js";
 import type { Logger } from "#root/domain/logger.interface";
 import type { MongoDocument } from "#root/domain/models/mongodocument";
+import type { IRepository } from "#root/domain/index.js";
 import type { PaginatedResult, PaginationOptions } from "#root/domain/index.js";
 
 /**
@@ -87,15 +90,11 @@ export class MongoDbRepository<TEntity extends Document>
       // Validate unique constraints before creation
       const isValid = await this.validateUniqueConstraints(data);
       if (!isValid) {
-        // Return null for duplicate detection (business logic decision)
-        this.logger.warn(
-          "Create operation failed: duplicate constraint violation",
-          {
-            data,
-            uniqueFields: this.uniqueFields,
-          },
-        );
-        return null;
+        throw new ApplicationError({
+          type: ErrorType.DUPLICATE_ERROR,
+          message: "Duplicate value detected",
+          statusCode: 409,
+        });
       }
 
       const document: MongoDocument<TEntity> = {
@@ -437,9 +436,9 @@ export class MongoDbRepository<TEntity extends Document>
   ): Promise<MongoDocument<TEntity> | null> {
     this.logger.debug("Repository: Finding single entity", { query });
     try {
-      const document = await this.collection.findOne(
-        query as Filter<MongoDocument<TEntity>>,
-      );
+      const document: WithId<MongoDocument<TEntity>> | null =
+        await this.collection.findOne(query as Filter<MongoDocument<TEntity>>);
+
       if (document) {
         this.logger.debug("Repository: Single entity found", {
           id: document._id,

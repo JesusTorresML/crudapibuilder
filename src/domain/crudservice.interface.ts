@@ -1,5 +1,6 @@
 import type { MongoDocument } from "./models/mongodocument";
 import type { PaginatedResult, PaginationOptions } from "./mongo.interface";
+import { ApplicationError } from "#config/errors.js";
 
 /**
  * Defines the contract for a generic application service. This interface
@@ -18,7 +19,7 @@ export interface IService<TEntity> {
    * @throws {ValidationError} When the entity data fails business validation rules.
    * @throws {ApplicationError} When the creation operation fails for other reasons (e.g., database error).
    */
-  create(data: TEntity): Promise<MongoDocument<TEntity> | null>;
+  create(data: TEntity): Promise<MongoDocument<TEntity>>;
 
   /**
    * Retrieves a single entity by its unique identifier.

@@ -1,8 +1,11 @@
 import type { Request, Response, NextFunction } from "express";
-import type { IService } from "#root/domain/crudservice.interface.js";
-import type { Logger, MongoDocument } from "#root/domain/index.js";
-import { ValidationError } from "#root/config/errors.js";
-import type { PaginationOptions } from "#root/domain/index.js";
+import { ValidationError } from "#config/errors.js";
+import type {
+  Logger,
+  MongoDocument,
+  IService,
+  PaginationOptions,
+} from "#domain/index.js";
 
 /**
  * Enhanced CRUD controller that handles HTTP requests and responses.
@@ -56,17 +59,8 @@ export class CrudController<TEntity> {
         });
       }
 
-      const createdEntity: MongoDocument<TEntity> | null =
+      const createdEntity: MongoDocument<TEntity> =
         await this.service.create(entityData);
-
-      if (!createdEntity) {
-        res.status(201).json({
-          success: false,
-          data: null,
-          message: "Creation of Document for entity failed",
-        });
-        return;
-      }
 
       const response = {
         success: true,

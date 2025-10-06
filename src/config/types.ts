@@ -2,8 +2,9 @@ import type { CompressorName } from "mongodb";
 
 // The root type for our raw convict configuration object.
 export type AppConfig = {
-  apiServerConfig: ApiServerConfig;
   database: DatabaseConfig;
+  mongo: MongoConfig;
+  server: ApiServerConfig;
 };
 
 // ----------------------------------------------------------
@@ -12,7 +13,7 @@ export type AppConfig = {
 
 export type ApiServerConfig = {
   hostname: string;
-  port: string;
+  port: number;
   allowedOrigins: string[];
   rateLimitWindowMs: number;
   rateLimitMaxRequests: number;
@@ -23,8 +24,13 @@ export type ApiServerConfig = {
 // ----------------------------------------------------------
 
 export type DatabaseConfig = {
-  serverHost: string;
-  serverPort: string;
-  compressionLevel: 0 | 6 | 1 | 8 | 2 | 3 | 4 | 5 | 7 | 9;
-  compresors: Array<CompressorName>;
+  name: string;
+  collection: string;
+};
+
+export type MongoConfig = {
+  host: string;
+  port: string;
+  compressionLevel?: 0 | 6 | 1 | 8 | 2 | 3 | 4 | 5 | 7 | 9;
+  compresors?: Array<CompressorName>;
 };

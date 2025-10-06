@@ -6,7 +6,7 @@ import type { Config } from "convict";
 
 import { configSchema } from "./schema.js";
 import type { AppConfig } from "./types.js";
-import { CustomError } from "#root/infrastructure/tools/errors.js";
+import { CustomError } from "#config/errors.js";
 
 const config: Config<AppConfig> = convict<AppConfig>(configSchema);
 

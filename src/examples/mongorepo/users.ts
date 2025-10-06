@@ -8,7 +8,7 @@
  */
 
 import { MongoClient } from "mongodb";
-import { MongoDbRepository } from "../infrastructure/persistance/mongorepo.js";
+import { MongoDbRepository } from "../../infrastructure/persistance/mongorepo.js";
 import type { MongoDocument } from "#root/domain/models/mongodocument.js";
 import { WinstonLogger } from "#root/infrastructure/logger/winston.logger.js";
 
